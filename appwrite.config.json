@@ -1,0 +1,24 @@
+{
+  "organizationId": "6ac657550030d13bfa15",
+  "projectId": "coachwallet",
+  "projectName": "CoachWallet",
+  "endpoint": "https://fra.cloud.appwrite.io/v1",
+  "functions": [
+    {
+      "$id": "default-categories",
+      "name": "default-categories",
+      "runtime": "node-22",
+      "path": "functions/default-categories",
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "execute": ["users"],
+      "events": ["users.*.create"],
+      "schedule": "",
+      "timeout": 15,
+      "enabled": true,
+      "logging": true,
+      "ignore": ["node_modules", ".git"],
+      "scopes": ["rows.read", "rows.write"]
+    }
+  ]
+}

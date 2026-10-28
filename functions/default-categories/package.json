@@ -1,0 +1,10 @@
+{
+  "name": "default-categories",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/main.js",
+  "dependencies": {
+    "node-appwrite": "^31.1.0"
+  }
+}
