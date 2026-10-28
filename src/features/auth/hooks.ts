@@ -5,7 +5,15 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { deleteAccount, getCurrentUser, signIn, signOut, signUp } from "./api";
+import {
+  confirmPasswordRecovery,
+  deleteAccount,
+  getCurrentUser,
+  requestPasswordRecovery,
+  signIn,
+  signOut,
+  signUp,
+} from "./api";
 
 export const authKeys = {
   user: ["auth", "user"] as const,
@@ -70,4 +78,12 @@ export function useDeleteAccount() {
     // Kullanıcı sunucuda silindiği için oturumu da geçersiz; yerel durumu sıfırla.
     onSuccess: () => resetToSignedOut(queryClient),
   });
+}
+
+export function useRequestPasswordRecovery() {
+  return useMutation({ mutationFn: requestPasswordRecovery });
+}
+
+export function useConfirmPasswordRecovery() {
+  return useMutation({ mutationFn: confirmPasswordRecovery });
 }

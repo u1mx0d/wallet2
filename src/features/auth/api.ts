@@ -2,7 +2,7 @@ import { AppwriteException, ID } from "react-native-appwrite";
 
 import { account, FUNCTION_IDS, functions } from "@/lib/appwrite/client";
 
-import type { SignInInput, SignUpInput } from "./schemas";
+import type { ForgotPasswordInput, SignInInput, SignUpInput } from "./schemas";
 
 export type AuthUser = Awaited<ReturnType<typeof account.get>>;
 
@@ -81,4 +81,41 @@ export async function deleteAccount(): Promise<void> {
   ) {
     throw new AccountDeletionError(execution.responseStatusCode);
   }
+}
+
+export type PasswordRecoveryRequest = {
+  /** Kod onaylanırken gereken kullanıcı ID'si. Hesap yoksa Appwrite rastgele bir ID döner. */
+  userId: string;
+  /** E-postada da yazan güvenlik ifadesi; kullanıcı e-postanın kendi isteğine ait olduğunu doğrular. */
+  phrase: string | null;
+};
+
+/**
+ * E-postaya 6 haneli şifre sıfırlama kodu gönderir (15 dakika geçerli, tek kullanımlık).
+ * Hesap olsun olmasın aynı şekilde başarılı döner; hangi e-postaların kayıtlı olduğu açığa çıkmaz.
+ */
+export async function requestPasswordRecovery({
+  email,
+}: ForgotPasswordInput): Promise<PasswordRecoveryRequest> {
+  const token = await account.createRecoveryOTP({ email, phrase: true });
+  const phrase =
+    "phrase" in token &&
+    typeof token.phrase === "string" &&
+    token.phrase.length > 0
+      ? token.phrase
+      : null;
+  return { userId: token.userId, phrase };
+}
+
+/** Kodu doğrulayıp yeni şifreyi kaydeder. Oturum AÇMAZ; ardından signIn çağrılmalı. */
+export async function confirmPasswordRecovery({
+  userId,
+  code,
+  password,
+}: {
+  userId: string;
+  code: string;
+  password: string;
+}): Promise<void> {
+  await account.updateRecoveryOTP({ userId, secret: code, password });
 }

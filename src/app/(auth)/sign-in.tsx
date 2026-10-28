@@ -78,6 +78,19 @@ export default function SignInScreen() {
       />
 
       <Button
+        title="Şifremi unuttum"
+        variant="ghost"
+        onPress={() =>
+          router.push({
+            pathname: "/forgot-password",
+            params: { email: form.values.email.trim() },
+          })
+        }
+        disabled={signInMutation.isPending}
+        fullWidth
+      />
+
+      <Button
         title="Hesabın yok mu? Kayıt ol"
         variant="ghost"
         onPress={() => router.push("/sign-up")}

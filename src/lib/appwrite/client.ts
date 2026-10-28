@@ -9,7 +9,9 @@ import { env } from "@/lib/env";
 export const appwriteClient = new Client()
   .setEndpoint(env.appwriteEndpoint)
   .setProject(env.appwriteProjectId)
-  .setPlatform(env.appwritePlatform);
+  .setPlatform(env.appwritePlatform)
+  // Appwrite'ın gönderdiği e-postalar ve sunucu mesajları için Türkçe tercihi.
+  .setLocale("tr");
 
 export const account = new Account(appwriteClient);
 export const tablesDB = new TablesDB(appwriteClient);
