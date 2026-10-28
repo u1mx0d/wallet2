@@ -48,7 +48,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "appwrite:setup": "node --env-file=.env.setup scripts/appwrite/setup.mjs",
-    "appwrite:test-isolation": "node --env-file=.env.setup scripts/appwrite/test-isolation.mjs"
+    "appwrite:test-isolation": "node --env-file=.env.setup scripts/appwrite/test-isolation.mjs",
+    "appwrite:cleanup-orphans": "node --env-file=.env.setup scripts/appwrite/cleanup-orphans.mjs"
   },
   "private": true
 }

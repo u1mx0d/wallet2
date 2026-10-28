@@ -1,4 +1,4 @@
-import { Account, Client, TablesDB } from "react-native-appwrite";
+import { Account, Client, Functions, TablesDB } from "react-native-appwrite";
 
 import { env } from "@/lib/env";
 
@@ -13,3 +13,10 @@ export const appwriteClient = new Client()
 
 export const account = new Account(appwriteClient);
 export const tablesDB = new TablesDB(appwriteClient);
+export const functions = new Functions(appwriteClient);
+
+/** Appwrite Function ID'leri. appwrite.config.json ile BİREBİR aynı olmalı. */
+export const FUNCTION_IDS = {
+  defaultCategories: "default-categories",
+  deleteAccount: "delete-account",
+} as const;

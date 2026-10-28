@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { Alert, View } from "react-native";
 
 import { Button, Card, Screen, Text } from "@/components/ui";
@@ -5,6 +6,7 @@ import { useSession, useSignOut } from "@/features/auth/hooks";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 
 export default function HomeScreen() {
+  const router = useRouter();
   const session = useSession();
   const signOutMutation = useSignOut();
   const user = session.data;
@@ -53,6 +55,14 @@ export default function HomeScreen() {
         variant="secondary"
         onPress={confirmSignOut}
         loading={signOutMutation.isPending}
+        fullWidth
+      />
+
+      <Button
+        title="Hesabı sil"
+        variant="ghost"
+        onPress={() => router.push("/delete-account")}
+        disabled={signOutMutation.isPending}
         fullWidth
       />
     </Screen>

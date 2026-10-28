@@ -1,6 +1,6 @@
 import { AppwriteException, ID } from "react-native-appwrite";
 
-import { account } from "@/lib/appwrite/client";
+import { account, FUNCTION_IDS, functions } from "@/lib/appwrite/client";
 
 import type { SignInInput, SignUpInput } from "./schemas";
 
@@ -53,5 +53,32 @@ export async function signOut(): Promise<void> {
     // Oturum zaten yoksa (401) çıkış yapılmış sayılır.
     if (error instanceof AppwriteException && error.code === 401) return;
     throw error;
+  }
+}
+
+/** Function çalıştı ama silme tamamlanamadı (ör. süre sınırı, sunucu hatası). */
+export class AccountDeletionError extends Error {
+  constructor(public readonly statusCode: number) {
+    super(`Hesap silme tamamlanamadı (HTTP ${statusCode}).`);
+    this.name = "AccountDeletionError";
+  }
+}
+
+/**
+ * Hesabı ve tüm verileri sunucuda siler. Kimlik, Appwrite'ın eklediği
+ * x-appwrite-user-id header'ından belirlenir; gövdeye kimlik bilgisi konmaz.
+ */
+export async function deleteAccount(): Promise<void> {
+  const execution = await functions.createExecution({
+    functionId: FUNCTION_IDS.deleteAccount,
+    body: "{}",
+    async: false,
+  });
+
+  if (
+    execution.status !== "completed" ||
+    execution.responseStatusCode !== 200
+  ) {
+    throw new AccountDeletionError(execution.responseStatusCode);
   }
 }
