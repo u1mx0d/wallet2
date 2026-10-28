@@ -1,3 +1,4 @@
+import { MAX_AMOUNT_MINOR } from "@/domain/money";
 import { env } from "@/lib/env";
 
 /**
@@ -16,11 +17,11 @@ export type TableId = (typeof TABLES)[keyof typeof TABLES];
 
 /**
  * Sunucudaki kolon sınırlarının istemci karşılıkları.
- * Zod şemaları (ADIM 3-4) bu sabitleri kullanacak; sınırlar tek yerden değişsin diye burada.
+ * Zod şemaları bu sabitleri kullanır; sınırlar tek yerden değişsin diye burada.
  */
 export const LIMITS = {
-  /** Kuruş cinsinden en büyük tutar (≈ 10 milyar TL). */
-  maxAmountMinor: 999_999_999_999,
+  /** Kuruş cinsinden en büyük tutar (≈ 10 milyar TL). Kaynak: src/domain/money.ts */
+  maxAmountMinor: MAX_AMOUNT_MINOR,
   maxLots: 1_000_000_000,
   categoryNameMaxLength: 50,
   noteMaxLength: 500,

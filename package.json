@@ -38,7 +38,8 @@
     "@types/react": "~19.3.0",
     "node-appwrite": "^31.1.0",
     "tailwindcss": "^3.4.19",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
   },
   "scripts": {
     "start": "expo start",
@@ -49,7 +50,9 @@
     "lint": "expo lint",
     "appwrite:setup": "node --env-file=.env.setup scripts/appwrite/setup.mjs",
     "appwrite:test-isolation": "node --env-file=.env.setup scripts/appwrite/test-isolation.mjs",
-    "appwrite:cleanup-orphans": "node --env-file=.env.setup scripts/appwrite/cleanup-orphans.mjs"
+    "appwrite:cleanup-orphans": "node --env-file=.env.setup scripts/appwrite/cleanup-orphans.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "private": true
 }
