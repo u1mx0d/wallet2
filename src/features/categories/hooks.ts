@@ -3,16 +3,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUserId } from "@/features/auth/useCurrentUserId";
 
 import {
-    createCategory,
-    deleteCategory,
-    fetchCategories,
-    updateCategory,
+  createCategory,
+  deleteCategory,
+  fetchCategories,
+  updateCategory,
 } from "./api";
 import { removeCategory, upsertCategory } from "./cache";
 import type { Category, CategoryInput, CategoryUpdate } from "./schemas";
 
 export const categoryKeys = {
   all: (userId: string) => ["categories", userId] as const,
+};
+
+/** Bağlantı şeridi (SyncStatusBanner) "categories" ile başlayan mutation anahtarlarını izler. */
+const mutationKeys = {
+  create: ["categories", "create"] as const,
+  update: ["categories", "update"] as const,
+  delete: ["categories", "delete"] as const,
 };
 
 export function useCategories() {
@@ -32,6 +39,7 @@ export function useCreateCategory() {
   const key = categoryKeys.all(userId);
 
   return useMutation({
+    mutationKey: mutationKeys.create,
     mutationFn: ({ id, input }: { id: string; input: CategoryInput }) =>
       createCategory({ userId, id, input }),
     onMutate: async ({ id, input }): Promise<Snapshot> => {
@@ -57,6 +65,7 @@ export function useUpdateCategory() {
   const key = categoryKeys.all(userId);
 
   return useMutation({
+    mutationKey: mutationKeys.update,
     mutationFn: ({
       previous,
       input,
@@ -88,6 +97,7 @@ export function useDeleteCategory() {
   const key = categoryKeys.all(userId);
 
   return useMutation({
+    mutationKey: mutationKeys.delete,
     mutationFn: ({ id }: { id: string }) => deleteCategory({ userId, id }),
     onSuccess: (_result, { id }) => {
       const current = queryClient.getQueryData<Category[]>(key);

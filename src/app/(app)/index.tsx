@@ -1,112 +1,85 @@
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Alert, View } from "react-native";
 
-import { Button, Card, Screen, Skeleton, Text } from "@/components/ui";
-import { formatTry } from "@/domain/money";
+import { SyncStatusBanner } from "@/components/SyncStatusBanner";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Screen,
+  Skeleton,
+  Text,
+} from "@/components/ui";
 import { useSession, useSignOut } from "@/features/auth/hooks";
 import { useCategories } from "@/features/categories/hooks";
-import { newTransactionId } from "@/features/transactions/api";
-import {
-  useCreateTransaction,
-  useDeleteTransaction,
-  useTransactions,
-} from "@/features/transactions/hooks";
+import { TransactionRow } from "@/features/transactions/components/TransactionRow";
+import { useTransactions } from "@/features/transactions/hooks";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 
-/** GEÇİCİ: ADIM 4b veri katmanı testi. ADIM 4c'de kaldırılacak. */
-function DevDataCard() {
-  const categories = useCategories();
+const RECENT_COUNT = 5;
+
+function RecentTransactions() {
+  const router = useRouter();
+  const [now] = useState(() => new Date());
   const transactions = useTransactions();
-  const createMutation = useCreateTransaction();
-  const deleteMutation = useDeleteTransaction();
+  const categories = useCategories();
 
-  const categoryList = categories.data ?? [];
-  const categoryNames = new Map(
-    categoryList.map((category) => [category.id, category.name]),
+  const categoryById = new Map(
+    (categories.data ?? []).map((category) => [category.id, category]),
   );
-  const firstExpenseCategory = categoryList.find(
-    (category) => category.type === "expense",
-  );
-  const items = transactions.data?.pages.flatMap((page) => page.items) ?? [];
-  const latest = items[0];
-
-  const addRandomExpense = () => {
-    if (!firstExpenseCategory) return;
-    createMutation.mutate({
-      id: newTransactionId(),
-      input: {
-        type: "expense",
-        // 1,00 TL ile 500,00 TL arasında rastgele bir TAM SAYI kuruş değeri.
-        amountMinor: 100 + Math.floor(Math.random() * 49_901),
-        categoryId: firstExpenseCategory.id,
-        note: "Geliştirici testi",
-        date: new Date().toISOString(),
-      },
-    });
-  };
-
-  const error =
-    categories.error ??
-    transactions.error ??
-    createMutation.error ??
-    deleteMutation.error;
+  const items = (
+    transactions.data?.pages.flatMap((page) => page.items) ?? []
+  ).slice(0, RECENT_COUNT);
 
   return (
     <Card>
-      <Text variant="subtitle">Geliştirici testi (ADIM 4b)</Text>
-
-      {categories.isPending ? (
-        <Skeleton className="h-4 w-1/2" />
-      ) : (
-        <Text tone="muted">
-          Kategoriler: {categoryList.filter((c) => c.type === "expense").length}{" "}
-          gider, {categoryList.filter((c) => c.type === "income").length} gelir
-        </Text>
-      )}
-
-      {createMutation.isPaused || deleteMutation.isPaused ? (
-        <Text tone="warning">Çevrimdışı: bağlantı gelince gönderilecek.</Text>
-      ) : null}
-
-      {error ? <Text tone="expense">{getErrorMessage(error)}</Text> : null}
+      <Text variant="subtitle">Son işlemler</Text>
 
       {transactions.isPending ? (
-        <View className="gap-2">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
+        <View className="gap-3">
+          {[0, 1, 2].map((key) => (
+            <View key={key} className="flex-row items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <View className="flex-1 gap-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/3" />
+              </View>
+            </View>
+          ))}
         </View>
+      ) : transactions.isError ? (
+        <ErrorState
+          description={getErrorMessage(transactions.error)}
+          onRetry={() => void transactions.refetch()}
+          retrying={transactions.isFetching}
+          className="py-4"
+        />
       ) : items.length === 0 ? (
-        <Text tone="muted">Henüz işlem yok.</Text>
+        <EmptyState
+          title="Henüz işlem yok"
+          description="İlk gelir veya giderini ekleyerek başla."
+          className="py-4"
+        />
       ) : (
-        items.slice(0, 5).map((item) => (
-          <View key={item.id} className="flex-row items-center justify-between">
-            <Text className="flex-1" numberOfLines={1}>
-              {categoryNames.get(item.categoryId) ?? "Bilinmeyen kategori"}
-            </Text>
-            <Text numeric tone={item.type === "income" ? "income" : "expense"}>
-              {formatTry(
-                item.type === "income" ? item.amountMinor : -item.amountMinor,
-              )}
-            </Text>
-          </View>
-        ))
+        <View>
+          {items.map((transaction) => (
+            <TransactionRow
+              key={transaction.id}
+              transaction={transaction}
+              category={categoryById.get(transaction.categoryId)}
+              now={now}
+              onPress={() =>
+                router.push({
+                  pathname: "/transactions/[id]",
+                  params: { id: transaction.id },
+                })
+              }
+            />
+          ))}
+        </View>
       )}
-
-      <Button
-        title="Rastgele gider ekle"
-        size="sm"
-        onPress={addRandomExpense}
-        disabled={!firstExpenseCategory}
-        fullWidth
-      />
-      <Button
-        title="Son işlemi sil"
-        size="sm"
-        variant="secondary"
-        onPress={() => latest && deleteMutation.mutate({ id: latest.id })}
-        disabled={!latest}
-        fullWidth
-      />
     </Card>
   );
 }
@@ -137,15 +110,40 @@ export default function HomeScreen() {
         <Text tone="muted">Dashboard ADIM 5'te burada olacak.</Text>
       </View>
 
-      <Card>
-        <Text variant="subtitle">Hesap</Text>
-        <Text tone="muted">E-posta: {user?.email}</Text>
-        <Text variant="caption" tone="muted">
-          Kullanıcı ID: {user?.$id}
-        </Text>
-      </Card>
+      <SyncStatusBanner />
 
-      <DevDataCard />
+      <View className="flex-row gap-3">
+        <Button
+          title="Gider ekle"
+          variant="danger"
+          className="flex-1"
+          onPress={() =>
+            router.push({
+              pathname: "/transactions/new",
+              params: { type: "expense" },
+            })
+          }
+        />
+        <Button
+          title="Gelir ekle"
+          className="flex-1"
+          onPress={() =>
+            router.push({
+              pathname: "/transactions/new",
+              params: { type: "income" },
+            })
+          }
+        />
+      </View>
+
+      <RecentTransactions />
+
+      <Button
+        title="Kategorileri yönet"
+        variant="secondary"
+        onPress={() => router.push("/categories")}
+        fullWidth
+      />
 
       {signOutMutation.isError ? (
         <View
@@ -158,7 +156,7 @@ export default function HomeScreen() {
 
       <Button
         title="Çıkış yap"
-        variant="secondary"
+        variant="ghost"
         onPress={confirmSignOut}
         loading={signOutMutation.isPending}
         fullWidth

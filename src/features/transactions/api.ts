@@ -6,9 +6,9 @@ import { DATABASE_ID, TABLES } from "@/lib/appwrite/schema";
 
 import type { TransactionFilters, TransactionPage } from "./cache";
 import {
-    parseTransactionRow,
-    type Transaction,
-    type TransactionInput,
+  parseTransactionRow,
+  type Transaction,
+  type TransactionInput,
 } from "./schemas";
 
 export const TRANSACTIONS_PAGE_SIZE = 25;
@@ -58,6 +58,23 @@ export async function fetchTransactionsPage({
     nextCursor:
       result.rows.length === TRANSACTIONS_PAGE_SIZE && last ? last.$id : null,
   };
+}
+
+/** Tek işlem. Bulunamazsa (silinmiş veya başkasına ait) null döner. */
+export async function fetchTransaction(
+  id: string,
+): Promise<Transaction | null> {
+  try {
+    const row = await tablesDB.getRow({
+      databaseId: DATABASE_ID,
+      tableId: TABLES.transactions,
+      rowId: id,
+    });
+    return toTransaction(row);
+  } catch (error) {
+    if (error instanceof AppwriteException && error.code === 404) return null;
+    throw error;
+  }
 }
 
 export async function createTransaction({

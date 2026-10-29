@@ -13,9 +13,11 @@ import { Text } from "./Text";
  */
 export type InputRef = ComponentRef<typeof TextInput>;
 
+export type InputSize = "md" | "lg";
+
 export type InputProps = Omit<
   TextInputProps,
-  "placeholderTextColor" | "ref"
+  "placeholderTextColor" | "ref" | "className"
 > & {
   /** Görünür etiket. Ekran okuyucu da bunu okur; boş bırakılamaz. */
   label: string;
@@ -23,18 +25,31 @@ export type InputProps = Omit<
   error?: string;
   /** Hata yokken alanın altında gösterilen yardımcı metin. */
   hint?: string;
+  /** "lg": tutar gibi öne çıkan alanlar için büyük ve kalın yazı. */
+  size?: InputSize;
   ref?: Ref<InputRef>;
   /** Dış kapsayıcı için yerleşim sınıfları (margin vb.). */
   containerClassName?: string;
 };
 
+const textClasses: Record<InputSize, string> = {
+  md: "text-base",
+  lg: "text-2xl font-semibold",
+};
+
+/**
+ * Not: Dışarıdan className ALINMAZ. Alana stil verilirse temel sınıfları (çerçeve, zemin,
+ * yükseklik) ezerdi. Görünüm yalnızca size ve multiline ile değişir.
+ */
 export function Input({
   label,
   error,
   hint,
+  size = "md",
   ref,
   containerClassName,
   editable = true,
+  multiline,
   onFocus,
   onBlur,
   ...rest
@@ -57,11 +72,15 @@ export function Input({
         accessibilityHint={error ?? hint}
         accessibilityState={{ disabled: !editable }}
         editable={editable}
+        multiline={multiline}
+        textAlignVertical={multiline ? "top" : "center"}
         placeholderTextColor={colors.muted}
         selectionColor={colors.primary}
         cursorColor={colors.primary}
         className={cn(
-          "min-h-[48px] rounded-xl border bg-surface px-4 py-3 text-base text-foreground",
+          "rounded-xl border bg-surface px-4 py-3 text-foreground",
+          multiline ? "min-h-[96px]" : "min-h-[48px]",
+          textClasses[size],
           borderClass,
           !editable && "opacity-50",
         )}

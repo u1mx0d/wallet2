@@ -9,6 +9,11 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.foreground,
+        headerTitleStyle: { color: colors.foreground },
+        headerShadowVisible: false,
+        headerBackButtonDisplayMode: "minimal",
       }}
     />
   );

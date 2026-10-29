@@ -1,34 +1,45 @@
 import {
-    useInfiniteQuery,
-    useMutation,
-    useQueryClient,
-    type QueryClient,
-    type QueryKey,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
 } from "@tanstack/react-query";
 
 import { useCurrentUserId } from "@/features/auth/useCurrentUserId";
 
 import {
-    createTransaction,
-    deleteTransaction,
-    fetchTransactionsPage,
-    updateTransaction,
+  createTransaction,
+  deleteTransaction,
+  fetchTransaction,
+  fetchTransactionsPage,
+  updateTransaction,
 } from "./api";
 import {
-    insertTransaction,
-    removeTransaction,
-    replaceTransaction,
-    type TransactionFilters,
-    type TransactionPages,
+  insertTransaction,
+  removeTransaction,
+  replaceTransaction,
+  type TransactionFilters,
+  type TransactionPages,
 } from "./cache";
 import type { Transaction, TransactionInput } from "./schemas";
 
 export const transactionKeys = {
-  /** Kullanıcının tüm işlem sorguları (listeler ve ileride dashboard toplamları). */
+  /** Kullanıcının tüm işlem sorguları (listeler, tekil kayıtlar, ileride dashboard toplamları). */
   all: (userId: string) => ["transactions", userId] as const,
   lists: (userId: string) => ["transactions", userId, "list"] as const,
   list: (userId: string, filters: TransactionFilters) =>
     ["transactions", userId, "list", filters] as const,
+  detail: (userId: string, id: string) =>
+    ["transactions", userId, "detail", id] as const,
+};
+
+/** Bağlantı şeridi (SyncStatusBanner) "transactions" ile başlayan mutation anahtarlarını izler. */
+const mutationKeys = {
+  create: ["transactions", "create"] as const,
+  update: ["transactions", "update"] as const,
+  delete: ["transactions", "delete"] as const,
 };
 
 export function useTransactions(filters: TransactionFilters = {}) {
@@ -39,6 +50,34 @@ export function useTransactions(filters: TransactionFilters = {}) {
       fetchTransactionsPage({ userId, filters, cursor: pageParam }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
+}
+
+function findInLists(
+  queryClient: QueryClient,
+  userId: string,
+  id: string,
+): Transaction | undefined {
+  const entries = queryClient.getQueriesData<TransactionPages>({
+    queryKey: transactionKeys.lists(userId),
+  });
+  for (const [, data] of entries) {
+    const found = data?.pages
+      .flatMap((page) => page.items)
+      .find((item) => item.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/** Tek işlem. Listelerde yüklüyse oradan anında gelir, yoksa sunucudan okunur. null: bulunamadı. */
+export function useTransaction(id: string) {
+  const queryClient = useQueryClient();
+  const userId = useCurrentUserId();
+  return useQuery({
+    queryKey: transactionKeys.detail(userId, id),
+    queryFn: () => fetchTransaction(id),
+    initialData: () => findInLists(queryClient, userId, id),
   });
 }
 
@@ -82,6 +121,7 @@ export function useCreateTransaction() {
   const userId = useCurrentUserId();
 
   return useMutation({
+    mutationKey: mutationKeys.create,
     mutationFn: ({ id, input }: { id: string; input: TransactionInput }) =>
       createTransaction({ userId, id, input }),
     onMutate: ({ id, input }) => {
@@ -105,6 +145,7 @@ export function useUpdateTransaction() {
   const userId = useCurrentUserId();
 
   return useMutation({
+    mutationKey: mutationKeys.update,
     mutationFn: ({
       previous,
       input,
@@ -129,6 +170,7 @@ export function useDeleteTransaction() {
   const userId = useCurrentUserId();
 
   return useMutation({
+    mutationKey: mutationKeys.delete,
     mutationFn: ({ id }: { id: string }) => deleteTransaction({ id }),
     onMutate: ({ id }) =>
       updateAllLists(queryClient, userId, (data) =>

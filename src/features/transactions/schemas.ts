@@ -1,9 +1,13 @@
 import { z } from "zod";
 
-import { MAX_AMOUNT_MINOR } from "@/domain/money";
 import {
-    transactionTypeSchema,
-    type TransactionType,
+  MAX_AMOUNT_MINOR,
+  MONEY_PARSE_ERROR_MESSAGES,
+  parseTryInput,
+} from "@/domain/money";
+import {
+  transactionTypeSchema,
+  type TransactionType,
 } from "@/features/categories/schemas";
 import { LIMITS } from "@/lib/appwrite/limits";
 
@@ -64,3 +68,35 @@ export const transactionInputSchema = z.object({
 });
 
 export type TransactionInput = z.output<typeof transactionInputSchema>;
+
+/** Kullanıcının yazdığı tutar metni → kuruş. Hata mesajları Türkçe. */
+const amountField = z.string().transform((value, ctx) => {
+  const parsed = parseTryInput(value);
+  if (!parsed.ok) {
+    ctx.addIssue({
+      code: "custom",
+      message: MONEY_PARSE_ERROR_MESSAGES[parsed.error],
+    });
+    return z.NEVER;
+  }
+  if (parsed.value < 1) {
+    ctx.addIssue({ code: "custom", message: "Tutar en az ₺0,01 olmalı." });
+    return z.NEVER;
+  }
+  return parsed.value;
+});
+
+/**
+ * Form alanları (hepsi metin) → TransactionInput.
+ * Alan adları: type, amount, categoryId, note, date (ISO).
+ */
+export const transactionFormSchema = z
+  .object({
+    type: transactionTypeSchema,
+    amount: amountField,
+    categoryId: z.string().min(1, "Kategori seç."),
+    note: z.string(),
+    date: z.string(),
+  })
+  .transform(({ amount, ...rest }) => ({ ...rest, amountMinor: amount }))
+  .pipe(transactionInputSchema);
