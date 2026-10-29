@@ -26,7 +26,7 @@ import {
 import type { Transaction, TransactionInput } from "./schemas";
 
 export const transactionKeys = {
-  /** Kullanıcının tüm işlem sorguları (listeler, tekil kayıtlar, ileride dashboard toplamları). */
+  /** Kullanıcının tüm işlem sorguları (listeler, tekil kayıtlar, dashboard aralıkları). */
   all: (userId: string) => ["transactions", userId] as const,
   lists: (userId: string) => ["transactions", userId, "list"] as const,
   list: (userId: string, filters: TransactionFilters) =>
@@ -115,6 +115,28 @@ function restore(
   for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
 }
 
+/** Geri alınabilir silme için: işlemi sunucuya dokunmadan tüm listelerden kaldırır. */
+export function removeFromTransactionLists(
+  queryClient: QueryClient,
+  userId: string,
+  id: string,
+): Promise<Snapshot> {
+  return updateAllLists(queryClient, userId, (data) =>
+    removeTransaction(data, id),
+  );
+}
+
+/** Geri alma: işlemi tüm listelerde (filtreye uyuyorsa) doğru yerine geri koyar. */
+export function restoreToTransactionLists(
+  queryClient: QueryClient,
+  userId: string,
+  transaction: Transaction,
+): Promise<Snapshot> {
+  return updateAllLists(queryClient, userId, (data, filters) =>
+    insertTransaction(data, transaction, filters),
+  );
+}
+
 /** Çağıran, ID'yi newTransactionId() ile üretir (optimistic kayıt ve tekrar deneme güvenliği için). */
 export function useCreateTransaction() {
   const queryClient = useQueryClient();
@@ -165,6 +187,7 @@ export function useUpdateTransaction() {
   });
 }
 
+/** Doğrudan silme. Ekranlar bunun yerine useUndoDelete().scheduleDelete kullanır. */
 export function useDeleteTransaction() {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();

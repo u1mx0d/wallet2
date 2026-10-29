@@ -23,6 +23,7 @@ import { SummaryCards } from "@/features/dashboard/components/SummaryCards";
 import { useDashboard } from "@/features/dashboard/useDashboard";
 import { TransactionRow } from "@/features/transactions/components/TransactionRow";
 import { useTransactions } from "@/features/transactions/hooks";
+import { useUndoDelete } from "@/features/transactions/undo/UndoDeleteProvider";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 import { cn } from "@/lib/cn";
 
@@ -42,7 +43,15 @@ function RecentTransactions({ now }: { now: Date }) {
 
   return (
     <Card>
-      <Text variant="subtitle">Son işlemler</Text>
+      <View className="flex-row items-center justify-between">
+        <Text variant="subtitle">Son işlemler</Text>
+        <Button
+          title="Tümünü gör"
+          variant="ghost"
+          size="sm"
+          onPress={() => router.push("/history")}
+        />
+      </View>
 
       {transactions.isPending ? (
         <View className="gap-3">
@@ -95,6 +104,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const session = useSession();
   const signOutMutation = useSignOut();
+  const { flushPendingDelete } = useUndoDelete();
   const user = session.data;
 
   const [now] = useState(() => new Date());
@@ -107,7 +117,11 @@ export default function HomeScreen() {
       {
         text: "Çıkış yap",
         style: "destructive",
-        onPress: () => signOutMutation.mutate(),
+        onPress: () => {
+          // Geri alma süresi dolmamış bir silme varsa oturum kapanmadan gönder.
+          flushPendingDelete();
+          signOutMutation.mutate();
+        },
       },
     ]);
   };

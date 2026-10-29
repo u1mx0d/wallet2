@@ -52,7 +52,8 @@ describe("computeAxis", () => {
     const axis = computeAxis([-2000, -100]);
     expect(axis.noOfSections).toBe(1);
     expect(axis.mostNegativeValue).toBeLessThanOrEqual(-2000);
-    expect(axis.mostNegativeValue % axis.stepValue).toBe(0);
+    // -2000 % 500 JavaScript'te -0 verir; işaretsiz kalana bakılır.
+    expect(Math.abs(axis.mostNegativeValue % axis.stepValue)).toBe(0);
   });
 
   it("maksimum değer her zaman en büyük değeri kapsar", () => {

@@ -50,6 +50,8 @@ export function computeAxis(
     noOfSections,
     maxValue: noOfSections * stepValue,
     noOfSectionsBelowXAxis,
-    mostNegativeValue: -noOfSectionsBelowXAxis * stepValue,
+    // -0 * x JavaScript'te -0 verir; negatif bölüm yoksa açıkça 0 döndür.
+    mostNegativeValue:
+      noOfSectionsBelowXAxis === 0 ? 0 : -noOfSectionsBelowXAxis * stepValue,
   };
 }

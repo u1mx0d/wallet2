@@ -13,6 +13,12 @@ export type TransactionRowProps = {
   category: Category | undefined;
   now: Date;
   onPress: () => void;
+  /** Uzun basma (ör. "Düzenle / Sil" menüsü). */
+  onLongPress?: () => void;
+  /** Verilirse ekran okuyucu eylemleri arasına "Sil" eklenir. */
+  onDelete?: () => void;
+  /** Gün başlığı altında tarih tekrar yazılmasın diye (History). */
+  hideDate?: boolean;
 };
 
 export function TransactionRow({
@@ -20,6 +26,9 @@ export function TransactionRow({
   category,
   now,
   onPress,
+  onLongPress,
+  onDelete,
+  hideDate = false,
 }: TransactionRowProps) {
   const isIncome = transaction.type === "income";
   const signedAmount = isIncome
@@ -29,12 +38,32 @@ export function TransactionRow({
   const dayLabel = formatDayLabel(new Date(transaction.date), now);
   const categoryName = category?.name ?? "Silinmiş kategori";
 
+  const subtitle = hideDate
+    ? (transaction.note ?? (isIncome ? "Gelir" : "Gider"))
+    : transaction.note
+      ? `${dayLabel} · ${transaction.note}`
+      : dayLabel;
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${categoryName}, ${isIncome ? "gelir" : "gider"} ${formatTry(transaction.amountMinor)}, ${dayLabel}${transaction.note ? `, not: ${transaction.note}` : ""}`}
-      accessibilityHint="Düzenlemek için dokun"
+      accessibilityHint={
+        onDelete
+          ? "Düzenlemek için dokun. Silmek için eylemler menüsünü kullan."
+          : "Düzenlemek için dokun"
+      }
+      accessibilityActions={
+        onDelete
+          ? [{ name: "activate" }, { name: "delete", label: "Sil" }]
+          : undefined
+      }
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "activate") onPress();
+        if (event.nativeEvent.actionName === "delete") onDelete?.();
+      }}
       onPress={onPress}
+      onLongPress={onLongPress}
       className="min-h-[56px] flex-row items-center gap-3 py-2"
     >
       <CategoryIcon
@@ -46,7 +75,7 @@ export function TransactionRow({
           {categoryName}
         </Text>
         <Text variant="caption" tone="muted" numberOfLines={1}>
-          {transaction.note ? `${dayLabel} · ${transaction.note}` : dayLabel}
+          {subtitle}
         </Text>
       </View>
       <Text

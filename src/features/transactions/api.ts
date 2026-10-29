@@ -27,6 +27,18 @@ function toTransaction(row: unknown): Transaction {
   return transaction;
 }
 
+/** Arama: notunda metin geçen VEYA kategorisi eşleşen kategorilerden biri olan işlemler. */
+function searchQuery(filters: TransactionFilters): string | null {
+  if (!filters.search) return null;
+  const noteMatch = Query.contains("note", filters.search);
+  if (!filters.searchCategoryIds || filters.searchCategoryIds.length === 0)
+    return noteMatch;
+  return Query.or([
+    noteMatch,
+    Query.equal("categoryId", filters.searchCategoryIds),
+  ]);
+}
+
 export async function fetchTransactionsPage({
   userId,
   filters,
@@ -36,13 +48,16 @@ export async function fetchTransactionsPage({
   filters: TransactionFilters;
   cursor: string | null;
 }): Promise<TransactionPage> {
-  // userId ilk filtre: userId_date ve userId_category_date indeksleri kullanılır.
+  // userId ilk filtre: userId_date ve userId_category_date indeksleri kullanılır;
+  // aramadaki alt metin taraması da yalnızca bu kullanıcının kayıtlarında yapılır.
   const queries = [Query.equal("userId", userId)];
   if (filters.type) queries.push(Query.equal("type", filters.type));
   if (filters.categoryId)
     queries.push(Query.equal("categoryId", filters.categoryId));
   if (filters.from) queries.push(Query.greaterThanEqual("date", filters.from));
   if (filters.to) queries.push(Query.lessThanEqual("date", filters.to));
+  const search = searchQuery(filters);
+  if (search) queries.push(search);
   queries.push(Query.orderDesc("date"), Query.limit(TRANSACTIONS_PAGE_SIZE));
   if (cursor) queries.push(Query.cursorAfter(cursor));
 

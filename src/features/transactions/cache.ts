@@ -11,6 +11,10 @@ export type TransactionFilters = {
   from?: string;
   /** Dahil, ISO tarih-saat. */
   to?: string;
+  /** Notunda bu metin geçen VEYA kategorisi searchCategoryIds içinde olan işlemler. */
+  search?: string;
+  /** Adında arama metni geçen kategorilerin ID'leri (telefonda hesaplanır). */
+  searchCategoryIds?: string[];
 };
 
 export type TransactionPage = {
@@ -44,6 +48,14 @@ export function matchesFilters(
   const time = Date.parse(transaction.date);
   if (filters.from && time < Date.parse(filters.from)) return false;
   if (filters.to && time > Date.parse(filters.to)) return false;
+  if (filters.search) {
+    const term = filters.search.toLocaleLowerCase("tr-TR");
+    const inNote =
+      transaction.note?.toLocaleLowerCase("tr-TR").includes(term) ?? false;
+    const inCategory =
+      filters.searchCategoryIds?.includes(transaction.categoryId) ?? false;
+    if (!inNote && !inCategory) return false;
+  }
   return true;
 }
 

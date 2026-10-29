@@ -1,21 +1,21 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 
 import {
-    Button,
-    EmptyState,
-    ErrorState,
-    Screen,
-    Skeleton,
+  Button,
+  EmptyState,
+  ErrorState,
+  Screen,
+  Skeleton,
 } from "@/components/ui";
-import { formatMinorForInput, formatTry } from "@/domain/money";
+import { formatMinorForInput } from "@/domain/money";
 import { TransactionForm } from "@/features/transactions/components/TransactionForm";
 import {
-    useDeleteTransaction,
-    useTransaction,
-    useUpdateTransaction,
+  useTransaction,
+  useUpdateTransaction,
 } from "@/features/transactions/hooks";
+import { useUndoDelete } from "@/features/transactions/undo/UndoDeleteProvider";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 
 export default function EditTransactionScreen() {
@@ -23,7 +23,7 @@ export default function EditTransactionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const transaction = useTransaction(id);
   const updateMutation = useUpdateTransaction();
-  const deleteMutation = useDeleteTransaction();
+  const { scheduleDelete } = useUndoDelete();
 
   useEffect(() => {
     if (updateMutation.isPaused) router.back();
@@ -74,23 +74,10 @@ export default function EditTransactionScreen() {
     );
   }
 
-  const confirmDelete = () => {
-    Alert.alert(
-      "İşlemi sil",
-      `${formatTry(current.amountMinor)} tutarındaki ${current.type === "income" ? "gelir" : "gider"} silinsin mi?`,
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Sil",
-          style: "destructive",
-          onPress: () => {
-            // Optimistic: listeden hemen kalkar; başarısız olursa geri gelir ve ana ekranda uyarı çıkar.
-            deleteMutation.mutate({ id: current.id });
-            router.back();
-          },
-        },
-      ],
-    );
+  const deleteWithUndo = () => {
+    // Listeden hemen kalkar; ekranın altındaki "Geri al" ile 5 saniye içinde geri alınabilir.
+    scheduleDelete(current);
+    router.back();
   };
 
   return (
@@ -123,7 +110,7 @@ export default function EditTransactionScreen() {
           <Button
             title="İşlemi sil"
             variant="ghost"
-            onPress={confirmDelete}
+            onPress={deleteWithUndo}
             disabled={updateMutation.isPending}
             fullWidth
           />
