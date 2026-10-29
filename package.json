@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.24",
+    "@react-native-community/netinfo": "12.0.1",
     "@tanstack/react-query": "^5.105.0",
     "babel-preset-expo": "~58.0.0",
     "expo": "~58.0.20",

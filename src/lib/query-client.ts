@@ -1,5 +1,32 @@
-import { QueryClient } from "@tanstack/react-query";
+import NetInfo from "@react-native-community/netinfo";
+import {
+  focusManager,
+  onlineManager,
+  QueryClient,
+} from "@tanstack/react-query";
+import { AppState } from "react-native";
 import { AppwriteException } from "react-native-appwrite";
+
+/**
+ * Bağlantı durumu: çevrimdışıyken sorgular beklemeye alınır, yazma işlemleri (mutation)
+ * "paused" olur ve bağlantı gelince otomatik gönderilir.
+ * isInternetReachable başlangıçta null olabilir; null "bilinmiyor" demektir, çevrimiçi sayılır.
+ */
+onlineManager.setEventListener((setOnline) =>
+  NetInfo.addEventListener((state) => {
+    setOnline(
+      state.isConnected !== false && state.isInternetReachable !== false,
+    );
+  }),
+);
+
+/** Uygulama ön plana gelince eskimiş sorgular yenilenir. */
+focusManager.setEventListener((setFocused) => {
+  const subscription = AppState.addEventListener("change", (status) => {
+    setFocused(status === "active");
+  });
+  return () => subscription.remove();
+});
 
 /**
  * 4xx hataları (yetkisiz, bulunamadı, geçersiz istek) tekrar denemekle düzelmez;
