@@ -12,17 +12,24 @@ import {
   Skeleton,
   Text,
 } from "@/components/ui";
+import type { Period } from "@/domain/periods";
 import { useSession, useSignOut } from "@/features/auth/hooks";
 import { useCategories } from "@/features/categories/hooks";
+import { ExpenseDonutCard } from "@/features/dashboard/components/ExpenseDonutCard";
+import { MonthlyBarsCard } from "@/features/dashboard/components/MonthlyBarsCard";
+import { NetTrendCard } from "@/features/dashboard/components/NetTrendCard";
+import { PeriodSelector } from "@/features/dashboard/components/PeriodSelector";
+import { SummaryCards } from "@/features/dashboard/components/SummaryCards";
+import { useDashboard } from "@/features/dashboard/useDashboard";
 import { TransactionRow } from "@/features/transactions/components/TransactionRow";
 import { useTransactions } from "@/features/transactions/hooks";
 import { getErrorMessage } from "@/lib/appwrite/errors";
+import { cn } from "@/lib/cn";
 
 const RECENT_COUNT = 5;
 
-function RecentTransactions() {
+function RecentTransactions({ now }: { now: Date }) {
   const router = useRouter();
-  const [now] = useState(() => new Date());
   const transactions = useTransactions();
   const categories = useCategories();
 
@@ -90,6 +97,10 @@ export default function HomeScreen() {
   const signOutMutation = useSignOut();
   const user = session.data;
 
+  const [now] = useState(() => new Date());
+  const [period, setPeriod] = useState<Period>({ kind: "month" });
+  const dashboard = useDashboard(period, now);
+
   const confirmSignOut = () => {
     Alert.alert("Çıkış yap", "Hesabından çıkmak istediğine emin misin?", [
       { text: "Vazgeç", style: "cancel" },
@@ -101,13 +112,15 @@ export default function HomeScreen() {
     ]);
   };
 
+  const dashboardError =
+    dashboard.periodQuery.error ?? dashboard.monthsQuery.error;
+
   return (
     <Screen scroll>
       <View className="gap-1">
         <Text variant="display">
           Merhaba{user?.name ? `, ${user.name}` : ""}
         </Text>
-        <Text tone="muted">Dashboard ADIM 5'te burada olacak.</Text>
       </View>
 
       <SyncStatusBanner />
@@ -136,7 +149,44 @@ export default function HomeScreen() {
         />
       </View>
 
-      <RecentTransactions />
+      <PeriodSelector period={period} onChange={setPeriod} now={now} />
+
+      {dashboard.truncated ? (
+        <View
+          accessibilityRole="alert"
+          className="rounded-xl bg-warning/15 p-3"
+        >
+          <Text tone="warning">
+            Bu dönemde çok fazla işlem var; özet ve grafikler eksik olabilir.
+            Daha kısa bir dönem seç.
+          </Text>
+        </View>
+      ) : null}
+
+      {dashboardError && !dashboard.summary ? (
+        <ErrorState
+          description={getErrorMessage(dashboardError)}
+          onRetry={() => {
+            void dashboard.periodQuery.refetch();
+            void dashboard.monthsQuery.refetch();
+          }}
+          retrying={
+            dashboard.periodQuery.isFetching || dashboard.monthsQuery.isFetching
+          }
+        />
+      ) : (
+        <View className={cn("gap-4", dashboard.isRefreshing && "opacity-60")}>
+          <SummaryCards summary={dashboard.summary} />
+          <ExpenseDonutCard
+            slices={dashboard.breakdown}
+            totalExpenseMinor={dashboard.summary?.expenseMinor ?? 0}
+          />
+          <MonthlyBarsCard monthly={dashboard.monthly} />
+          <NetTrendCard trend={dashboard.trend} />
+        </View>
+      )}
+
+      <RecentTransactions now={now} />
 
       <Button
         title="Kategorileri yönet"
