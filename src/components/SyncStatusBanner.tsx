@@ -1,19 +1,21 @@
 import {
-    useMutationState,
-    useQueryClient,
-    type Mutation,
+  useMutationState,
+  useQueryClient,
+  type Mutation,
 } from "@tanstack/react-query";
 import { View } from "react-native";
 
 import { Button, Text } from "@/components/ui";
 import { useOnlineStatus } from "@/lib/useOnlineStatus";
 
+const SYNC_SCOPES = new Set(["transactions", "categories", "portfolio"]);
+
 /** Kullanıcı verisini değiştiren mutation'lar (anahtarları hooks dosyalarında tanımlı). */
 function isSyncMutation(
   mutation: Mutation<unknown, Error, unknown, unknown>,
 ): boolean {
   const scope = mutation.options.mutationKey?.[0];
-  return scope === "transactions" || scope === "categories";
+  return typeof scope === "string" && SYNC_SCOPES.has(scope);
 }
 
 /**

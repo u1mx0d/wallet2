@@ -26,5 +26,6 @@ export const USER_TASKS = {
   paths: {
     defaultCategories: "/default-categories",
     deleteAccount: "/delete-account",
+    trades: "/trades",
   },
 } as const;

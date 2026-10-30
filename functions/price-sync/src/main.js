@@ -2,7 +2,13 @@
  * Zamanlanmış fiyat servisi.
  *
  * Tetiklenme: schedule (Appwrite saatlik aralık; saatin dakikasını Appwrite seçer) veya
- * Console'dan elle (http). Kullanıcılar ÇAĞIRAMAZ (execute: []): kota korunur.
+ * Console'dan elle (http).
+ *
+ * KİMİN ÇALIŞTIRABİLECEĞİNİ Appwrite belirler: appwrite.config.json → "execute": [].
+ * Bu ayarla uygulama kullanıcılarının istekleri Function'a HİÇ ULAŞMAZ; yalnızca zamanlayıcı
+ * ve Console (proje yöneticisi) çalıştırabilir. Console istekleri yöneticinin kullanıcı
+ * kimliğini taşıdığı için kodda kullanıcı kimliğine göre ayrım YAPILMAZ.
+ * ⚠️ "execute" ayarı değiştirilirse Bürküt kotası kullanıcılara açılır (ADIM 10 kontrol listesi).
  *
  * Zamanlanmış çalıştırma seans penceresi dışındaysa (hafta sonu, gece) sağlayıcıya
  * İSTEK ATMADAN biter. Pencere içindeki her çalıştırma sağlayıcıya TEK istek atar.
@@ -159,12 +165,16 @@ async function markStale(tablesDB, symbols) {
 
 export default async ({ req, res, log, error }) => {
   const trigger = req.headers["x-appwrite-trigger"];
-  // Zamanlayıcı veya Console'dan elle çalıştırma. Kullanıcı çağrısı reddedilir (execute: [] ile zaten mümkün değil).
-  if (
-    trigger !== "schedule" &&
-    !(trigger === "http" && !req.headers["x-appwrite-user-id"])
-  ) {
-    return res.json({ ok: false, error: "forbidden" }, 403);
+  const hasUserId = Boolean(req.headers["x-appwrite-user-id"]);
+  log(
+    `Tetikleyici: ${trigger ?? "yok"} · kullanıcı kimliği: ${hasUserId ? "var" : "yok"}`,
+  );
+
+  // Kimin çalıştırabileceğini Appwrite'ın "execute" izni belirler (bkz. dosya başı).
+  // Burada yalnızca beklenmeyen tetikleyiciler (ör. event) reddedilir.
+  if (trigger !== "schedule" && trigger !== "http") {
+    error(`Beklenmeyen tetikleyici: ${trigger ?? "yok"}`);
+    return res.json({ ok: false, error: "unsupported_trigger" }, 400);
   }
 
   const now = new Date();

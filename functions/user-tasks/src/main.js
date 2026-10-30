@@ -5,7 +5,7 @@
  *  - event users.*.create            → varsayılan kategoriler (kimlik: event'teki kullanıcı nesnesi)
  *  - http  POST /default-categories  → varsayılan kategoriler (kategorisi olmayan eski kullanıcılar)
  *  - http  POST /delete-account      → hesap ve tüm veriler
- *  - (ADIM 9) http /trades           → alım/satım işlemleri
+ *  - http  POST /trades              → alım/satım ekleme, düzenleme, silme (hesap motoruyla doğrulanır)
  *
  * GÜVENLİK: http çağrılarında kullanıcı kimliği YALNIZCA x-appwrite-user-id header'ından alınır;
  * istek gövdesindeki hiçbir kimlik bilgisi kullanılmaz.
@@ -14,6 +14,7 @@ import { Client, TablesDB, Users } from "node-appwrite";
 
 import { createDefaultCategories } from "./default-categories.js";
 import { deleteUserAndData } from "./delete-account.js";
+import { handleTradeRequest, TradeRequestError } from "./trades.js";
 
 function parseJson(text) {
   try {
@@ -91,6 +92,30 @@ export default async ({ req, res, log, error }) => {
           `[delete-account] Kullanıcı ${userId} silinemedi: ${cause?.message ?? cause}`,
         );
         return res.json({ ok: false, error: "delete_failed" }, 500);
+      }
+    }
+
+    case "/trades": {
+      const body = parseJson(req.bodyText);
+      try {
+        const result = await handleTradeRequest({ tablesDB, userId, body });
+        log(`[trades] Kullanıcı ${userId}: ${body.action} başarılı.`);
+        return res.json({ ok: true, ...result });
+      } catch (cause) {
+        if (cause instanceof TradeRequestError) {
+          log(
+            `[trades] Kullanıcı ${userId}: ${body.action} reddedildi (${cause.code}).`,
+          );
+          return res.json(
+            { ok: false, error: cause.code, message: cause.message },
+            cause.status,
+          );
+        }
+        error(`[trades] Kullanıcı ${userId}: ${cause?.message ?? cause}`);
+        return res.json(
+          { ok: false, error: "trade_failed", message: "İşlem kaydedilemedi." },
+          500,
+        );
       }
     }
 
