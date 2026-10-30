@@ -17,8 +17,14 @@ export const account = new Account(appwriteClient);
 export const tablesDB = new TablesDB(appwriteClient);
 export const functions = new Functions(appwriteClient);
 
-/** Appwrite Function ID'leri. appwrite.config.json ile BİREBİR aynı olmalı. */
-export const FUNCTION_IDS = {
-  defaultCategories: "default-categories",
-  deleteAccount: "delete-account",
+/**
+ * Kullanıcı adına sunucu işleri yapan Function ve yolları.
+ * appwrite.config.json ve functions/user-tasks/src/main.js ile BİREBİR aynı olmalı.
+ */
+export const USER_TASKS = {
+  functionId: "user-tasks",
+  paths: {
+    defaultCategories: "/default-categories",
+    deleteAccount: "/delete-account",
+  },
 } as const;

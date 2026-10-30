@@ -1,6 +1,6 @@
 import { AppwriteException, ID } from "react-native-appwrite";
 
-import { account, FUNCTION_IDS, functions } from "@/lib/appwrite/client";
+import { account, functions, USER_TASKS } from "@/lib/appwrite/client";
 
 import type { ForgotPasswordInput, SignInInput, SignUpInput } from "./schemas";
 
@@ -70,7 +70,8 @@ export class AccountDeletionError extends Error {
  */
 export async function deleteAccount(): Promise<void> {
   const execution = await functions.createExecution({
-    functionId: FUNCTION_IDS.deleteAccount,
+    functionId: USER_TASKS.functionId,
+    xpath: USER_TASKS.paths.deleteAccount,
     body: "{}",
     async: false,
   });

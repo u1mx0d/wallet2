@@ -59,7 +59,8 @@
     "appwrite:test-isolation": "node --env-file=.env.setup scripts/appwrite/test-isolation.mjs",
     "appwrite:cleanup-orphans": "node --env-file=.env.setup scripts/appwrite/cleanup-orphans.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prices:set": "node --env-file=.env.setup scripts/appwrite/set-test-price.mjs"
   },
   "private": true,
   "expo": {

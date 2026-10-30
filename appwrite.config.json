@@ -5,36 +5,38 @@
   "endpoint": "https://fra.cloud.appwrite.io/v1",
   "functions": [
     {
-      "$id": "default-categories",
-      "name": "default-categories",
+      "$id": "user-tasks",
+      "name": "user-tasks",
       "runtime": "node-22",
-      "path": "functions/default-categories",
+      "path": "functions/user-tasks",
       "entrypoint": "src/main.js",
       "commands": "npm install",
       "execute": ["users"],
       "events": ["users.*.create"],
       "schedule": "",
-      "timeout": 15,
-      "enabled": true,
-      "logging": true,
-      "ignore": ["node_modules", ".git"],
-      "scopes": ["rows.read", "rows.write"]
-    },
-    {
-      "$id": "delete-account",
-      "name": "delete-account",
-      "runtime": "node-22",
-      "path": "functions/delete-account",
-      "entrypoint": "src/main.js",
-      "commands": "npm install",
-      "execute": ["users"],
-      "events": [],
-      "schedule": "",
+      "interval": 0,
       "timeout": 30,
       "enabled": true,
       "logging": true,
       "ignore": ["node_modules", ".git"],
       "scopes": ["rows.read", "rows.write", "users.write"]
+    },
+    {
+      "$id": "price-sync",
+      "name": "price-sync",
+      "runtime": "node-22",
+      "path": "functions/price-sync",
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "execute": [],
+      "events": [],
+      "schedule": "",
+      "interval": 60,
+      "timeout": 120,
+      "enabled": true,
+      "logging": true,
+      "ignore": ["node_modules", ".git", "src/**/*.test.js"],
+      "scopes": ["rows.read", "rows.write"]
     }
   ]
 }

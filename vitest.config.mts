@@ -7,8 +7,9 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
-    // Yalnızca saf TypeScript modüllerinin testleri. React Native bileşen testi yok.
-    include: ["src/**/*.test.ts"],
+    // Saf modüllerin testleri: uygulama (TS) ve Appwrite Function'ları (JS).
+    // React Native bileşen testi yok.
+    include: ["src/**/*.test.ts", "functions/**/src/**/*.test.js"],
     environment: "node",
   },
 });

@@ -1,21 +1,11 @@
 /**
- * Varsayılan kategoriler.
- *
- * Tetiklenme:
- *  - event: users.*.create → yeni kullanıcı oluşturulunca otomatik.
- *  - http: giriş yapmış kullanıcı uygulamadan çağırır (kategorisi olmayan eski
- *    kullanıcılar için; ADIM 4'te bağlanacak).
- *
- * Güvenlik: Kullanıcı ID'si ASLA istek gövdesinden okunmaz. Event'te Appwrite'ın
- * gönderdiği kullanıcı nesnesinden, http'de x-appwrite-user-id header'ından alınır.
- *
- * İdempotent: Satır ID'leri sabittir (`${userId}_${slug}`). Function tekrar
- * çalışırsa Appwrite 409 döner ve bu "zaten var" sayılır; çift kayıt oluşmaz.
+ * Varsayılan kategoriler. İdempotent: satır ID'leri sabittir (`${userId}_${slug}`);
+ * tekrar çalışırsa Appwrite 409 döner ve bu "zaten var" sayılır.
  */
-import { Client, Permission, Role, TablesDB } from "node-appwrite";
+import { Permission, Role } from "node-appwrite";
 
-// scripts/appwrite/setup.mjs ve src/lib/appwrite/schema.ts ile aynı olmalı.
-const DATABASE_ID = "wallet";
+import { DATABASE_ID } from "./constants.js";
+
 const CATEGORIES_TABLE_ID = "categories";
 const MAX_ROW_ID_LENGTH = 36;
 
@@ -121,34 +111,7 @@ const DEFAULT_CATEGORIES = [
   },
 ];
 
-function resolveUserId(req) {
-  const trigger = req.headers["x-appwrite-trigger"];
-
-  if (trigger === "event") {
-    const payload = JSON.parse(req.bodyText || "{}");
-    return typeof payload.$id === "string" ? payload.$id : null;
-  }
-
-  if (trigger === "http") {
-    const userId = req.headers["x-appwrite-user-id"];
-    return typeof userId === "string" && userId.length > 0 ? userId : null;
-  }
-
-  return null;
-}
-
-export default async ({ req, res, log, error }) => {
-  const userId = resolveUserId(req);
-  if (!userId) {
-    return res.json({ ok: false, error: "unauthorized" }, 401);
-  }
-
-  const client = new Client()
-    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
-    .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
-    .setKey(req.headers["x-appwrite-key"]);
-  const tablesDB = new TablesDB(client);
-
+export async function createDefaultCategories({ tablesDB, userId }) {
   const owner = Role.user(userId);
   const permissions = [
     Permission.read(owner),
@@ -162,8 +125,7 @@ export default async ({ req, res, log, error }) => {
   for (const category of DEFAULT_CATEGORIES) {
     const rowId = `${userId}_${category.slug}`;
     if (rowId.length > MAX_ROW_ID_LENGTH) {
-      error(`Satır ID'si çok uzun (${rowId.length}): ${rowId}`);
-      return res.json({ ok: false, error: "row_id_too_long" }, 500);
+      throw new Error(`Satır ID'si çok uzun (${rowId.length}): ${rowId}`);
     }
 
     try {
@@ -182,22 +144,13 @@ export default async ({ req, res, log, error }) => {
       });
       created += 1;
     } catch (cause) {
-      if (cause?.code === 409) {
-        existing += 1;
-        continue;
-      }
-      error(
-        `Kategori oluşturulamadı (${category.slug}): ${cause?.message ?? cause}`,
-      );
-      return res.json(
-        { ok: false, error: "create_failed", created, existing },
-        500,
-      );
+      if (cause?.code !== 409)
+        throw new Error(
+          `Kategori oluşturulamadı (${category.slug}): ${cause?.message ?? cause}`,
+        );
+      existing += 1;
     }
   }
 
-  log(
-    `Kullanıcı ${userId}: ${created} kategori oluşturuldu, ${existing} zaten vardı.`,
-  );
-  return res.json({ ok: true, created, existing });
-};
+  return { created, existing };
+}

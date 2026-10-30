@@ -1,15 +1,15 @@
 import { AppwriteException, ID, Query } from "react-native-appwrite";
 
-import { FUNCTION_IDS, functions, tablesDB } from "@/lib/appwrite/client";
+import { functions, tablesDB, USER_TASKS } from "@/lib/appwrite/client";
 import { ownerPermissions } from "@/lib/appwrite/permissions";
 import { DATABASE_ID, TABLES } from "@/lib/appwrite/schema";
 
 import { sortCategories } from "./cache";
 import {
-    parseCategoryRow,
-    type Category,
-    type CategoryInput,
-    type CategoryUpdate,
+  parseCategoryRow,
+  type Category,
+  type CategoryInput,
+  type CategoryUpdate,
 } from "./schemas";
 
 const PAGE_SIZE = 100;
@@ -59,10 +59,11 @@ async function listAllCategories(userId: string): Promise<Category[]> {
   return rows.map(parseCategoryRow).filter(isDefined);
 }
 
-/** default-categories Function'ını çağırır. Function idempotenttir; tekrar çağrılması güvenlidir. */
+/** user-tasks Function'ının /default-categories yolu. İdempotenttir; tekrar çağrılması güvenlidir. */
 async function ensureDefaultCategories(): Promise<void> {
   const execution = await functions.createExecution({
-    functionId: FUNCTION_IDS.defaultCategories,
+    functionId: USER_TASKS.functionId,
+    xpath: USER_TASKS.paths.defaultCategories,
     body: "{}",
     async: false,
   });

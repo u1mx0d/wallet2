@@ -116,7 +116,7 @@ const TABLES = [
     id: "trades",
     name: "Trades",
     // Tablo seviyesinde HİÇ izin yok: istemci doğrudan yazamaz.
-    // Kayıtlar, lot kontrolü yapan bir Function üzerinden yazılacak (ADIM 8).
+    // Kayıtlar, lot kontrolü yapan bir Function üzerinden yazılacak (ADIM 9).
     permissions: [],
     rowSecurity: true,
     columns: [
@@ -165,6 +165,8 @@ const TABLES = [
     rowSecurity: false,
     columns: [
       { kind: "varchar", key: "symbol", size: 12, required: true },
+      // Şirket adı (sembol arama ekranı için). Sağlayıcıdan gelir; isteğe bağlı.
+      { kind: "varchar", key: "name", size: 100, required: false },
       {
         kind: "integer",
         key: "priceMinor",
