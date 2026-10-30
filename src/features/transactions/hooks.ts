@@ -14,6 +14,12 @@ import {
   removeFromRange,
   upsertInRange,
 } from "@/features/dashboard/rangeCache";
+import {
+  PERSISTED_MUTATION_KEYS,
+  type CreateTransactionVariables,
+  type DeleteTransactionVariables,
+  type UpdateTransactionVariables,
+} from "@/lib/offline-queue";
 
 import {
   createTransaction,
@@ -40,13 +46,6 @@ export const transactionKeys = {
     ["transactions", userId, "detail", id] as const,
   /** Dashboard dönem aralıkları (bkz. features/dashboard/hooks.ts → dashboardKeys.range). */
   ranges: (userId: string) => ["transactions", userId, "range"] as const,
-};
-
-/** Bağlantı şeridi (SyncStatusBanner) "transactions" ile başlayan mutation anahtarlarını izler. */
-const mutationKeys = {
-  create: ["transactions", "create"] as const,
-  update: ["transactions", "update"] as const,
-  delete: ["transactions", "delete"] as const,
 };
 
 export function useTransactions(filters: TransactionFilters = {}) {
@@ -163,17 +162,20 @@ export function restoreToTransactionLists(
   return applyChange(queryClient, userId, { kind: "upsert", transaction });
 }
 
-/** Çağıran, ID'yi newTransactionId() ile üretir (optimistic kayıt ve tekrar deneme güvenliği için). */
+/**
+ * Çağıran, ID'yi newTransactionId() ile üretir (optimistic kayıt ve tekrar deneme güvenliği için).
+ * Değişkenlere kullanıcı ID'si hook tarafından eklenir (kalıcı kuyruk için).
+ */
 export function useCreateTransaction() {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();
 
-  return useMutation({
-    mutationKey: mutationKeys.create,
-    mutationFn: ({ id, input }: { id: string; input: TransactionInput }) =>
-      createTransaction({ userId, id, input }),
-    onMutate: ({ id, input }) =>
-      applyChange(queryClient, userId, {
+  const mutation = useMutation({
+    mutationKey: PERSISTED_MUTATION_KEYS.createTransaction,
+    mutationFn: (variables: CreateTransactionVariables) =>
+      createTransaction(variables),
+    onMutate: ({ userId: owner, id, input }) =>
+      applyChange(queryClient, owner, {
         kind: "upsert",
         transaction: { id, ...input, createdAt: new Date().toISOString() },
       }),
@@ -181,23 +183,24 @@ export function useCreateTransaction() {
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) }),
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: { id: string; input: TransactionInput }) =>
+      mutation.mutate({ ...variables, userId }),
+  };
 }
 
 export function useUpdateTransaction() {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();
 
-  return useMutation({
-    mutationKey: mutationKeys.update,
-    mutationFn: ({
-      previous,
-      input,
-    }: {
-      previous: Transaction;
-      input: TransactionInput;
-    }) => updateTransaction({ id: previous.id, input }),
-    onMutate: ({ previous, input }) =>
-      applyChange(queryClient, userId, {
+  const mutation = useMutation({
+    mutationKey: PERSISTED_MUTATION_KEYS.updateTransaction,
+    mutationFn: ({ previous, input }: UpdateTransactionVariables) =>
+      updateTransaction({ id: previous.id, input }),
+    onMutate: ({ userId: owner, previous, input }) =>
+      applyChange(queryClient, owner, {
         kind: "upsert",
         transaction: { ...previous, ...input },
       }),
@@ -205,6 +208,12 @@ export function useUpdateTransaction() {
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) }),
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: { previous: Transaction; input: TransactionInput }) =>
+      mutation.mutate({ ...variables, userId }),
+  };
 }
 
 /** Doğrudan silme. Ekranlar bunun yerine useUndoDelete().scheduleDelete kullanır. */
@@ -212,13 +221,20 @@ export function useDeleteTransaction() {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();
 
-  return useMutation({
-    mutationKey: mutationKeys.delete,
-    mutationFn: ({ id }: { id: string }) => deleteTransaction({ id }),
-    onMutate: ({ id }) =>
-      applyChange(queryClient, userId, { kind: "remove", id }),
+  const mutation = useMutation({
+    mutationKey: PERSISTED_MUTATION_KEYS.deleteTransaction,
+    mutationFn: ({ id }: DeleteTransactionVariables) =>
+      deleteTransaction({ id }),
+    onMutate: ({ userId: owner, id }) =>
+      applyChange(queryClient, owner, { kind: "remove", id }),
     onError: (_error, _variables, snapshot) => restore(queryClient, snapshot),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) }),
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: { id: string }) =>
+      mutation.mutate({ ...variables, userId }),
+  };
 }

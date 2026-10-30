@@ -3,8 +3,8 @@ import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui";
 import { formatTry } from "@/domain/money";
 import {
-    formatSignedBasisPoints,
-    type PositionValuation,
+  formatSignedBasisPoints,
+  type PositionValuation,
 } from "@/domain/portfolio";
 
 import { formatLots } from "../format";
@@ -21,14 +21,11 @@ export function PositionCard({
 }) {
   const pnl = position.unrealizedPnlMinor;
   const pnlTone = pnl === null ? "muted" : pnl >= 0 ? "income" : "expense";
-  const pnlText =
-    pnl === null
+  const pnlAmount = pnl === null ? null : formatTry(pnl, { sign: "always" });
+  const pnlPercent =
+    position.unrealizedPnlBasisPoints === null
       ? null
-      : `${formatTry(pnl, { sign: "always" })}${
-          position.unrealizedPnlBasisPoints === null
-            ? ""
-            : ` (${formatSignedBasisPoints(position.unrealizedPnlBasisPoints)})`
-        }`;
+      : formatSignedBasisPoints(position.unrealizedPnlBasisPoints);
 
   const accessibilityLabel = [
     `${position.symbol}${quote ? `, ${quote.name}` : ""}`,
@@ -36,7 +33,9 @@ export function PositionCard({
     position.marketValueMinor === null
       ? "fiyat yok"
       : `değer ${formatTry(position.marketValueMinor)}`,
-    pnlText ? `kâr zarar ${pnlText}` : null,
+    pnlAmount
+      ? `kâr zarar ${pnlAmount}${pnlPercent ? `, ${pnlPercent}` : ""}`
+      : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -53,25 +52,40 @@ export function PositionCard({
         <View className="flex-1">
           <Text className="font-semibold">{position.symbol}</Text>
           {quote ? (
-            <Text variant="caption" tone="muted" numberOfLines={1}>
+            <Text variant="caption" tone="muted" numberOfLines={2}>
               {quote.name}
             </Text>
           ) : null}
         </View>
-        <View className="items-end">
-          <Text numeric className="font-semibold">
+        <View className="max-w-[55%] shrink items-end">
+          <Text numeric className="text-right font-semibold">
             {position.marketValueMinor === null
               ? "Fiyat yok"
               : formatTry(position.marketValueMinor)}
           </Text>
-          {pnlText ? (
-            <Text variant="caption" numeric tone={pnlTone}>
-              {pnlText}
+          {pnlAmount ? (
+            <Text
+              variant="caption"
+              numeric
+              tone={pnlTone}
+              className="text-right"
+            >
+              {pnlAmount}
+            </Text>
+          ) : null}
+          {pnlPercent ? (
+            <Text
+              variant="caption"
+              numeric
+              tone={pnlTone}
+              className="text-right"
+            >
+              {pnlPercent}
             </Text>
           ) : null}
         </View>
       </View>
-      <View className="flex-row justify-between gap-3">
+      <View className="flex-row flex-wrap justify-between gap-x-3 gap-y-1">
         <Text variant="caption" tone="muted" numeric>
           {formatLots(position.lots)} lot · ort.{" "}
           {formatTry(position.averageCostMinor)}

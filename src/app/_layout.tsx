@@ -2,7 +2,8 @@
 import "react-native-url-polyfill/auto";
 import "../global.css";
 
-import { QueryClientProvider } from "@tanstack/react-query";
+import { useIsRestoring } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -13,6 +14,11 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorState, Screen } from "@/components/ui";
 import { useSession } from "@/features/auth/hooks";
 import { getErrorMessage } from "@/lib/appwrite/errors";
+import {
+  persistOptions,
+  registerMutationDefaults,
+  resumeOwnPendingMutations,
+} from "@/lib/offline-queue";
 import { queryClient } from "@/lib/query-client";
 import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
 
@@ -25,18 +31,29 @@ import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
  */
 LogBox.ignoreLogs(["Failed to parse cookie fallback"]);
 
+// Kalıcı kuyruktaki işlemlerin uygulama yeniden açılınca gönderilebilmesi için (bkz. offline-queue.ts).
+registerMutationDefaults(queryClient);
+
 // Oturum kontrolü bitene kadar splash ekranı açık kalsın (giriş ekranı bir an görünüp kaybolmasın).
 void SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { theme, colors } = useTheme();
   const session = useSession();
+  const isRestoring = useIsRestoring();
+  const userId = session.data?.$id;
 
   useEffect(() => {
     if (!session.isPending) {
       void SplashScreen.hideAsync();
     }
   }, [session.isPending]);
+
+  // Kuyruk diskten okunduktan ve oturum doğrulandıktan sonra bekleyen işlemleri gönder.
+  useEffect(() => {
+    if (!isRestoring && userId)
+      void resumeOwnPendingMutations(queryClient, userId);
+  }, [isRestoring, userId]);
 
   if (session.isPending) return null;
 
@@ -80,11 +97,14 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={persistOptions}
+      >
         <ThemeProvider>
           <RootNavigator />
         </ThemeProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </SafeAreaProvider>
   );
 }

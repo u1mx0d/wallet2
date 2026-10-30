@@ -4,12 +4,12 @@ import { useState } from "react";
 import { Alert, View } from "react-native";
 
 import {
-    Button,
-    Card,
-    Input,
-    Screen,
-    SegmentedControl,
-    Text,
+  Button,
+  Card,
+  Input,
+  Screen,
+  SegmentedControl,
+  Text,
 } from "@/components/ui";
 import { useSession, useSignOut } from "@/features/auth/hooks";
 import { InvestmentDisclaimer } from "@/features/portfolio/components/InvestmentDisclaimer";
@@ -83,18 +83,22 @@ export default function ProfileScreen() {
   const version = Constants.expoConfig?.version ?? "—";
 
   const confirmSignOut = () => {
-    Alert.alert("Çıkış yap", "Hesabından çıkmak istediğine emin misin?", [
-      { text: "Vazgeç", style: "cancel" },
-      {
-        text: "Çıkış yap",
-        style: "destructive",
-        onPress: () => {
-          // Geri alma süresi dolmamış bir silme varsa oturum kapanmadan gönder.
-          flushPendingDelete();
-          signOutMutation.mutate();
+    Alert.alert(
+      "Çıkış yap",
+      "Hesabından çıkmak istediğine emin misin? Bağlantı bekleyen değişikliklerin varsa çıkış yapınca silinir.",
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Çıkış yap",
+          style: "destructive",
+          onPress: () => {
+            // Geri alma süresi dolmamış bir silme varsa oturum kapanmadan gönder.
+            flushPendingDelete();
+            signOutMutation.mutate();
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   return (

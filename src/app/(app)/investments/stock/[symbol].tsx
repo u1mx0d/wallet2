@@ -3,44 +3,26 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import {
-    Button,
-    Card,
-    EmptyState,
-    ErrorState,
-    Screen,
-    Skeleton,
-    Text,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Screen,
+  Skeleton,
+  Text,
 } from "@/components/ui";
 import { formatTry } from "@/domain/money";
 import {
-    describeEngineError,
-    formatSignedBasisPoints,
+  describeEngineError,
+  formatSignedBasisPoints,
 } from "@/domain/portfolio";
 import { InvestmentDisclaimer } from "@/features/portfolio/components/InvestmentDisclaimer";
 import { QuoteFreshness } from "@/features/portfolio/components/QuoteFreshness";
 import { TradeRow } from "@/features/portfolio/components/TradeRow";
+import { ValueRow } from "@/features/portfolio/components/ValueRow";
 import { formatLots } from "@/features/portfolio/format";
 import { usePortfolio } from "@/features/portfolio/hooks";
 import { getErrorMessage } from "@/lib/appwrite/errors";
-
-function Row({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "income" | "expense";
-}) {
-  return (
-    <View className="flex-row justify-between gap-3">
-      <Text tone="muted">{label}</Text>
-      <Text numeric tone={tone}>
-        {value}
-      </Text>
-    </View>
-  );
-}
 
 const signTone = (value: number) =>
   value >= 0 ? ("income" as const) : ("expense" as const);
@@ -117,17 +99,15 @@ export default function StockDetailScreen() {
   const openTrade = (side: "buy" | "sell") =>
     router.push({ pathname: "/investments/trade", params: { side, symbol } });
 
+  const isOpen = position.lots > 0;
+
   return (
     <Screen scroll edges={["bottom"]}>
       {header}
 
       <View className="gap-1">
         <Text variant="title">{symbol}</Text>
-        {quote ? (
-          <Text tone="muted" numberOfLines={2}>
-            {quote.name}
-          </Text>
-        ) : null}
+        {quote ? <Text tone="muted">{quote.name}</Text> : null}
       </View>
 
       {quote ? (
@@ -135,7 +115,12 @@ export default function StockDetailScreen() {
           <Text variant="label" tone="muted">
             Güncel fiyat
           </Text>
-          <Text variant="display" numeric>
+          <Text
+            variant="display"
+            numeric
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {formatTry(quote.priceMinor)}
           </Text>
           {position.dailyChangeBasisPoints !== null ? (
@@ -151,52 +136,56 @@ export default function StockDetailScreen() {
 
       <Card>
         <Text variant="subtitle">Pozisyon</Text>
-        <Row label="Eldeki lot" value={formatLots(position.lots)} />
-        {position.lots > 0 ? (
-          <Row
-            label="Ortalama maliyet"
-            value={formatTry(position.averageCostMinor)}
+        <View className="gap-3">
+          <ValueRow label="Eldeki lot" value={formatLots(position.lots)} />
+          {isOpen ? (
+            <ValueRow
+              label="Ortalama maliyet"
+              value={formatTry(position.averageCostMinor)}
+            />
+          ) : null}
+          {isOpen ? (
+            <ValueRow
+              label="Toplam maliyet"
+              value={formatTry(position.totalCostMinor)}
+            />
+          ) : null}
+          {isOpen && position.marketValueMinor !== null ? (
+            <ValueRow
+              label="Piyasa değeri"
+              value={formatTry(position.marketValueMinor)}
+            />
+          ) : null}
+          {isOpen && position.unrealizedPnlMinor !== null ? (
+            <ValueRow
+              label="Gerçekleşmemiş kâr/zarar"
+              value={formatTry(position.unrealizedPnlMinor, { sign: "always" })}
+              detail={
+                position.unrealizedPnlBasisPoints === null
+                  ? undefined
+                  : formatSignedBasisPoints(position.unrealizedPnlBasisPoints)
+              }
+              tone={signTone(position.unrealizedPnlMinor)}
+              emphasize
+            />
+          ) : null}
+          {isOpen && position.dailyChangeMinor !== null ? (
+            <ValueRow
+              label="Günlük değişim (yaklaşık)"
+              value={formatTry(position.dailyChangeMinor, { sign: "always" })}
+              tone={signTone(position.dailyChangeMinor)}
+            />
+          ) : null}
+          <ValueRow
+            label="Gerçekleşmiş kâr/zarar"
+            value={formatTry(position.realizedPnlMinor, { sign: "always" })}
+            tone={signTone(position.realizedPnlMinor)}
           />
-        ) : null}
-        {position.lots > 0 ? (
-          <Row
-            label="Toplam maliyet"
-            value={formatTry(position.totalCostMinor)}
+          <ValueRow
+            label="Ödenen komisyon"
+            value={formatTry(position.feesPaidMinor)}
           />
-        ) : null}
-        {position.marketValueMinor !== null && position.lots > 0 ? (
-          <Row
-            label="Piyasa değeri"
-            value={formatTry(position.marketValueMinor)}
-          />
-        ) : null}
-        {position.unrealizedPnlMinor !== null && position.lots > 0 ? (
-          <Row
-            label="Gerçekleşmemiş kâr/zarar"
-            value={`${formatTry(position.unrealizedPnlMinor, { sign: "always" })}${
-              position.unrealizedPnlBasisPoints === null
-                ? ""
-                : ` (${formatSignedBasisPoints(position.unrealizedPnlBasisPoints)})`
-            }`}
-            tone={signTone(position.unrealizedPnlMinor)}
-          />
-        ) : null}
-        {position.dailyChangeMinor !== null && position.lots > 0 ? (
-          <Row
-            label="Günlük değişim (yaklaşık)"
-            value={formatTry(position.dailyChangeMinor, { sign: "always" })}
-            tone={signTone(position.dailyChangeMinor)}
-          />
-        ) : null}
-        <Row
-          label="Gerçekleşmiş kâr/zarar"
-          value={formatTry(position.realizedPnlMinor, { sign: "always" })}
-          tone={signTone(position.realizedPnlMinor)}
-        />
-        <Row
-          label="Ödenen komisyon"
-          value={formatTry(position.feesPaidMinor)}
-        />
+        </View>
       </Card>
 
       <View className="flex-row gap-3">
@@ -210,7 +199,7 @@ export default function StockDetailScreen() {
           variant="secondary"
           className="flex-1"
           onPress={() => openTrade("sell")}
-          disabled={position.lots === 0}
+          disabled={!isOpen}
         />
       </View>
 

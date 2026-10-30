@@ -5,6 +5,8 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
+import { realtime } from "@/lib/appwrite/client";
+
 import {
   confirmPasswordRecovery,
   deleteAccount,
@@ -25,12 +27,28 @@ export const authKeys = {
  *    (kök layout dahil) haber verilir ve korumalı rota giriş ekranına yönlendirir.
  *    (queryClient.clear() KULLANILMAZ: sorguları siler ama dinleyenlere haber vermez.)
  * 2) Sonra oturum dışındaki tüm sorguları siler: önceki kullanıcının hiçbir verisi kalmaz.
+ * 3) Bekleyen işlem kuyruğunu temizler: bir kullanıcının gönderilmemiş işlemleri aynı
+ *    telefonda başka bir kullanıcının oturumuyla ASLA gönderilmez.
  */
 function resetToSignedOut(queryClient: QueryClient): void {
   queryClient.setQueryData(authKeys.user, null);
   queryClient.removeQueries({
     predicate: (query) => query.queryKey[0] !== authKeys.user[0],
   });
+  queryClient.getMutationCache().clear();
+}
+
+/**
+ * Realtime bağlantısını oturum silinmeden ÖNCE düzgünce kapatır. Aksi halde sunucu, silinen
+ * oturumun bağlantısını kendisi koparır; SDK bunu "WebSocket error" olarak yazar ve yeniden
+ * bağlanmaya çalışır. Kapatma başarısız olsa bile çıkış devam eder.
+ */
+async function disconnectRealtime(): Promise<void> {
+  try {
+    await realtime.disconnect();
+  } catch {
+    // Bağlantı zaten kapalıysa veya kapatılamazsa çıkışı engelleme.
+  }
 }
 
 /** data: kullanıcı nesnesi (giriş yapılmış) | null (giriş yapılmamış). */
@@ -66,7 +84,10 @@ export function useSignUp() {
 export function useSignOut() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: signOut,
+    mutationFn: async () => {
+      await disconnectRealtime();
+      await signOut();
+    },
     onSuccess: () => resetToSignedOut(queryClient),
   });
 }
@@ -74,7 +95,10 @@ export function useSignOut() {
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: deleteAccount,
+    mutationFn: async () => {
+      await disconnectRealtime();
+      await deleteAccount();
+    },
     // Kullanıcı sunucuda silindiği için oturumu da geçersiz; yerel durumu sıfırla.
     onSuccess: () => resetToSignedOut(queryClient),
   });

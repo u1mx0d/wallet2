@@ -3,12 +3,23 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type MutateOptions,
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useCurrentUserId } from "@/features/auth/useCurrentUserId";
+import {
+  PERSISTED_MUTATION_KEYS,
+  type TradeVariables,
+} from "@/lib/offline-queue";
 
-import { fetchQuotes, fetchTrades, searchSymbols, submitTrade } from "./api";
+import {
+  fetchQuotes,
+  fetchTrades,
+  searchSymbols,
+  submitTrade,
+  type TradeRequest,
+} from "./api";
 import { buildPortfolio, heldSymbols } from "./portfolio-view";
 import { foldForSearch } from "./search";
 
@@ -71,15 +82,26 @@ export function useSymbolSearch(term: string) {
 
 /**
  * Alım/satım ekleme, düzenleme, silme. Optimistic DEĞİL: sunucu kuralları (fazla satış vb.)
- * onaylamadan ekranda değişiklik gösterilmez.
+ * onaylamadan ekranda değişiklik gösterilmez. Değişkenlere kullanıcı ID'si hook tarafından
+ * eklenir (kalıcı kuyruk için); sunucuya GÖNDERİLMEZ, kimlik sunucuda header'dan alınır.
  */
 export function useTradeMutation() {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();
-  return useMutation({
-    mutationKey: ["portfolio", "trade"],
-    mutationFn: submitTrade,
+
+  const mutation = useMutation({
+    mutationKey: PERSISTED_MUTATION_KEYS.trade,
+    mutationFn: ({ userId: _owner, ...request }: TradeVariables) =>
+      submitTrade(request as TradeRequest),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: portfolioKeys.all(userId) }),
   });
+
+  return {
+    ...mutation,
+    mutate: (
+      request: TradeRequest,
+      options?: MutateOptions<void, Error, TradeVariables, unknown>,
+    ) => mutation.mutate({ ...request, userId }, options),
+  };
 }
