@@ -8,11 +8,14 @@
  * Bu ayarla uygulama kullanıcılarının istekleri Function'a HİÇ ULAŞMAZ; yalnızca zamanlayıcı
  * ve Console (proje yöneticisi) çalıştırabilir. Console istekleri yöneticinin kullanıcı
  * kimliğini taşıdığı için kodda kullanıcı kimliğine göre ayrım YAPILMAZ.
- * ⚠️ "execute" ayarı değiştirilirse Bürküt kotası kullanıcılara açılır (ADIM 10 kontrol listesi).
+ * ⚠️ "execute" ayarı değiştirilirse Bürküt kotası kullanıcılara açılır.
  *
  * Zamanlanmış çalıştırma seans penceresi dışındaysa (hafta sonu, gece) sağlayıcıya
  * İSTEK ATMADAN biter. Pencere içindeki her çalıştırma sağlayıcıya TEK istek atar.
  * Sağlayıcı anahtarı yalnızca Function ortam değişkenindedir: BURKUT_API_KEY.
+ *
+ * Dayanıklılık: Geçici veritabanı hataları (ağ, 5xx, 429) bir kez yeniden denenir. Hiçbir hata
+ * yakalanmadan kalmaz; beklenmeyen hatalar hangi aşamada olduğuyla birlikte loglanır.
  */
 import { Client, Query, TablesDB } from "node-appwrite";
 
@@ -33,12 +36,35 @@ const PROVIDER_URL = "https://api.burkutportfoy.com/api/public/v1/stocks";
 const FETCH_TIMEOUT_MS = 15_000;
 const PAGE_SIZE = 100;
 const WRITE_CONCURRENCY = 5;
+const RETRY_DELAY_MS = 2_000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class ProviderError extends Error {
   constructor(message, status, retryAfter) {
     super(message);
     this.status = status;
     this.retryAfter = retryAfter;
+  }
+}
+
+/** Ağ hatası (kod yok), sunucu hatası (5xx) veya hız sınırı (429): tekrar denemeye değer. */
+function isTransient(cause) {
+  const code = cause?.code;
+  return typeof code !== "number" || code >= 500 || code === 429;
+}
+
+/** Geçici hatalarda RETRY_DELAY_MS bekleyip BİR KEZ daha dener. */
+async function withRetry(fn, log, label) {
+  try {
+    return await fn();
+  } catch (cause) {
+    if (!isTransient(cause)) throw cause;
+    log(
+      `${label}: geçici hata (${cause?.message ?? cause}); ${RETRY_DELAY_MS} ms sonra bir kez daha deneniyor.`,
+    );
+    await sleep(RETRY_DELAY_MS);
+    return fn();
   }
 }
 
@@ -163,7 +189,7 @@ async function markStale(tablesDB, symbols) {
   );
 }
 
-export default async ({ req, res, log, error }) => {
+async function run({ req, res, log, error }, setStage) {
   const trigger = req.headers["x-appwrite-trigger"];
   const hasUserId = Boolean(req.headers["x-appwrite-user-id"]);
   log(
@@ -199,16 +225,19 @@ export default async ({ req, res, log, error }) => {
     .setKey(req.headers["x-appwrite-key"]);
   const tablesDB = new TablesDB(client);
 
+  setStage("portföydeki sembollerin ve mevcut fiyatların okunması");
   const [held, existing] = await Promise.all([
-    listHeldSymbols(tablesDB),
-    listExistingPrices(tablesDB),
+    withRetry(() => listHeldSymbols(tablesDB), log, "Portföy sembolleri"),
+    withRetry(() => listExistingPrices(tablesDB), log, "Mevcut fiyatlar"),
   ]);
 
+  setStage("sağlayıcıdan fiyatların alınması");
   let json;
   try {
     json = await fetchProvider(apiKey);
   } catch (cause) {
     // Son geçerli fiyatları KORU; yalnızca portföydeki sembolleri "eski veri" olarak işaretle.
+    setStage("eski veri işaretlemesi (sağlayıcı hatası sonrası)");
     const marked = await markStale(
       tablesDB,
       planStaleMarks({ existing, symbols: held }),
@@ -227,6 +256,7 @@ export default async ({ req, res, log, error }) => {
     });
   }
 
+  setStage("sağlayıcı yanıtının doğrulanması");
   let parsed;
   try {
     parsed = parseBurkutResponse(json);
@@ -245,6 +275,7 @@ export default async ({ req, res, log, error }) => {
     });
   }
 
+  setStage("fiyatların yazılması");
   const fullRefresh = isEndOfDayRun(now) || existing.size === 0;
   const { writes, missingHeld } = planWrites({
     quotes: parsed.quotes,
@@ -282,4 +313,22 @@ export default async ({ req, res, log, error }) => {
     error(`Yazılamayan satırlar: ${written.failures.slice(0, 10).join(" | ")}`);
 
   return res.json(summary);
+}
+
+export default async (context) => {
+  let stage = "başlangıç";
+  const setStage = (next) => {
+    stage = next;
+  };
+
+  try {
+    return await run(context, setStage);
+  } catch (cause) {
+    // Hiçbir hata yakalanmadan kalmaz. Veritabanına ulaşılamıyorsa "eski veri" işareti de
+    // yazılamaz; bu durumda uygulama fiyatların yaşından eski veriyi kendisi fark eder.
+    context.error(
+      `Beklenmeyen hata (aşama: ${stage}): ${cause?.message ?? cause}`,
+    );
+    return context.res.json({ ok: false, error: "unexpected", stage }, 500);
+  }
 };
