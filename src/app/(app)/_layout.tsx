@@ -3,6 +3,11 @@ import { Stack } from "expo-router";
 import { UndoDeleteProvider } from "@/features/transactions/undo/UndoDeleteProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 
+// Bu stack'e doğrudan bir alt ekranla girilirse altında sekmeler olsun.
+export const unstable_settings = {
+  anchor: "(tabs)",
+};
+
 export default function AppLayout() {
   const { colors } = useTheme();
   return (

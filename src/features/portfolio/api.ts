@@ -5,11 +5,11 @@ import { functions, tablesDB, USER_TASKS } from "@/lib/appwrite/client";
 import { DATABASE_ID, TABLES } from "@/lib/appwrite/schema";
 
 import {
-    parseQuoteRow,
-    parseTradeRow,
-    type Quote,
-    type Trade,
-    type TradeFields,
+  parseQuoteRow,
+  parseTradeRow,
+  type Quote,
+  type Trade,
+  type TradeFields,
 } from "./schemas";
 import { foldForSearch } from "./search";
 
@@ -110,6 +110,15 @@ export class TradeRequestError extends Error {
   }
 }
 
+/**
+ * Function 30 sn senkron sınırına takılırsa Appwrite gövdesiz bir hata döndürür. Bu durumda
+ * işlem kaydedilmiş OLABİLİR. Aynı ekrandan tekrar göndermek güvenlidir: istek aynı ID'yi
+ * taşıdığı için sunucu ikinci kayıt oluşturmaz.
+ */
+const TIMEOUT_MESSAGE =
+  "Sunucu şu an yavaş yanıt veriyor. İşlem kaydedilmiş olabilir. Bu ekrandan tekrar kaydetmek " +
+  "güvenlidir; aynı işlem iki kez eklenmez.";
+
 const errorBodySchema = z.object({
   error: z.string(),
   message: z.string().optional(),
@@ -133,11 +142,19 @@ export async function submitTrade(request: TradeRequest): Promise<void> {
     body = {};
   }
   const parsed = errorBodySchema.safeParse(body);
+
+  if (!parsed.success) {
+    // Gövdesiz hata: büyük ihtimalle zaman aşımı veya Function'ın yarıda kesilmesi.
+    throw new TradeRequestError(
+      "timeout",
+      TIMEOUT_MESSAGE,
+      execution.responseStatusCode,
+    );
+  }
+
   throw new TradeRequestError(
-    parsed.success ? parsed.data.error : "trade_failed",
-    parsed.success && parsed.data.message
-      ? parsed.data.message
-      : "İşlem kaydedilemedi. Lütfen tekrar dene.",
+    parsed.data.error,
+    parsed.data.message ?? "İşlem kaydedilemedi. Lütfen tekrar dene.",
     execution.responseStatusCode,
   );
 }

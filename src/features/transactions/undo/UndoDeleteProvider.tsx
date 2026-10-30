@@ -1,13 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
 } from "react";
 import { AccessibilityInfo, AppState, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,14 +17,17 @@ import { formatTry } from "@/domain/money";
 import { useCurrentUserId } from "@/features/auth/useCurrentUserId";
 
 import {
-    removeFromTransactionLists,
-    restoreToTransactionLists,
-    useDeleteTransaction,
+  removeFromTransactionLists,
+  restoreToTransactionLists,
+  useDeleteTransaction,
 } from "../hooks";
 import type { Transaction } from "../schemas";
 
 /** Silme bu süre sonunda sunucuya gönderilir; öncesinde "Geri al" ile iptal edilebilir. */
 export const UNDO_WINDOW_MS = 5_000;
+
+/** Alt sekme çubuğunun yüksekliği kadar boşluk: çubuk sekmelerin üstünde kalsın. */
+const TAB_BAR_CLEARANCE = 64;
 
 type UndoDeleteContextValue = {
   /** İşlemi listeden hemen kaldırır; sunucu silmesini UNDO_WINDOW_MS sonra yapar. */
@@ -119,7 +122,7 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
               position: "absolute",
               left: 16,
               right: 16,
-              bottom: insets.bottom + 16,
+              bottom: insets.bottom + TAB_BAR_CLEARANCE,
             }}
           >
             <View

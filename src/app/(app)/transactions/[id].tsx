@@ -1,5 +1,4 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect } from "react";
 import { View } from "react-native";
 
 import {
@@ -24,10 +23,6 @@ export default function EditTransactionScreen() {
   const transaction = useTransaction(id);
   const updateMutation = useUpdateTransaction();
   const { scheduleDelete } = useUndoDelete();
-
-  useEffect(() => {
-    if (updateMutation.isPaused) router.back();
-  }, [updateMutation.isPaused, router]);
 
   const header = (
     <Stack.Screen options={{ headerShown: true, title: "İşlemi düzenle" }} />
@@ -75,7 +70,7 @@ export default function EditTransactionScreen() {
   }
 
   const deleteWithUndo = () => {
-    // Listeden hemen kalkar; ekranın altındaki "Geri al" ile 5 saniye içinde geri alınabilir.
+    // Listeden ve dashboard'dan hemen kalkar; ekranın altındaki "Geri al" ile 5 saniye içinde geri alınabilir.
     scheduleDelete(current);
     router.back();
   };
@@ -93,25 +88,18 @@ export default function EditTransactionScreen() {
         }}
         originalDate={new Date(current.date)}
         submitLabel="Değişiklikleri kaydet"
-        isSubmitting={updateMutation.isPending && !updateMutation.isPaused}
-        submitError={
-          updateMutation.isError ? getErrorMessage(updateMutation.error) : null
-        }
-        onChange={() => {
-          if (updateMutation.isError) updateMutation.reset();
+        isSubmitting={false}
+        submitError={null}
+        onSubmit={(input) => {
+          // Değişiklik anında görünür; sunucuya arka planda gider. Reddedilirse geri alınır.
+          updateMutation.mutate({ previous: current, input });
+          router.back();
         }}
-        onSubmit={(input) =>
-          updateMutation.mutate(
-            { previous: current, input },
-            { onSuccess: () => router.back() },
-          )
-        }
         footer={
           <Button
             title="İşlemi sil"
             variant="ghost"
             onPress={deleteWithUndo}
-            disabled={updateMutation.isPending}
             fullWidth
           />
         }

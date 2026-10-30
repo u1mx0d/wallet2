@@ -7,15 +7,18 @@
  *  - Kullanıcının TÜM işlemleri, değişiklik uygulanmış haliyle motordan tekrar geçirilir;
  *    herhangi bir anda eldekinden fazla satış oluşuyorsa istek reddedilir.
  *  - Satır yalnızca sahibinin OKUYABİLECEĞİ izinle yazılır; güncelleme/silme yalnızca bu yoldan.
+ *
+ * Performans: Bağımsız veritabanı okumaları (işlem listesi ve sembol kontrolü) AYNI ANDA yapılır.
+ * Appwrite yavaşladığında toplam süre ve 30 sn senkron sınırına takılma riski azalır.
  */
 import { ID, Permission, Query, Role } from "node-appwrite";
 
 import { DATABASE_ID } from "./constants.js";
 import {
-    computePositions,
-    describeEngineError,
-    normalizeSymbol,
-    validateTrade,
+  computePositions,
+  describeEngineError,
+  normalizeSymbol,
+  validateTrade,
 } from "./vendor/portfolio.js";
 
 const TRADES_TABLE_ID = "trades";
@@ -23,6 +26,7 @@ const PRICES_TABLE_ID = "price_cache";
 const PAGE_SIZE = 100;
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,35}$/;
 const FUTURE_TOLERANCE_MS = 24 * 60 * 60 * 1000;
+const ACTIONS = new Set(["create", "update", "delete"]);
 
 export class TradeRequestError extends Error {
   constructor(status, code, message) {
@@ -136,9 +140,20 @@ function findOwnTrade(trades, id) {
   return trade;
 }
 
+/** İşlem listesi ve sembol kontrolü AYNI ANDA; sembol bilinmiyorsa 422. */
+async function loadTradesAndCheckSymbol(tablesDB, userId, symbol) {
+  const [existing] = await Promise.all([
+    listUserTrades(tablesDB, userId),
+    assertKnownSymbol(tablesDB, symbol),
+  ]);
+  return existing;
+}
+
 export async function handleTradeRequest({ tablesDB, userId, body }) {
   const action = body?.action;
-  const existing = await listUserTrades(tablesDB, userId);
+  // Geçersiz işlem türü veritabanına hiç gidilmeden reddedilir.
+  if (!ACTIONS.has(action))
+    throw new TradeRequestError(400, "invalid_action", "Geçersiz işlem türü.");
 
   if (action === "create") {
     const fields = parseTradeFields(body.trade);
@@ -146,12 +161,16 @@ export async function handleTradeRequest({ tablesDB, userId, body }) {
       typeof body.id === "string" && ID_PATTERN.test(body.id)
         ? body.id
         : ID.unique();
+    const existing = await loadTradesAndCheckSymbol(
+      tablesDB,
+      userId,
+      fields.symbol,
+    );
 
-    // Aynı ID ile tekrar gelen istek (ör. ağ kopup yeniden denendi): mevcut kaydı döndür.
+    // Aynı ID ile tekrar gelen istek (ör. ağ kopup veya zaman aşımından sonra yeniden denendi): mevcut kaydı döndür.
     const already = existing.find((trade) => trade.id === id);
     if (already) return { trade: already, created: false };
 
-    await assertKnownSymbol(tablesDB, fields.symbol);
     // Yeni işlemin kayıt zamanı yok: motor onu aynı tarihli işlemlerin SONUNA koyar.
     assertConsistent([...existing, { id, ...fields }]);
 
@@ -177,10 +196,13 @@ export async function handleTradeRequest({ tablesDB, userId, body }) {
   }
 
   if (action === "update") {
-    const current = findOwnTrade(existing, body.id);
     const fields = parseTradeFields(body.trade);
-    if (fields.symbol !== current.symbol)
-      await assertKnownSymbol(tablesDB, fields.symbol);
+    const existing = await loadTradesAndCheckSymbol(
+      tablesDB,
+      userId,
+      fields.symbol,
+    );
+    const current = findOwnTrade(existing, body.id);
     assertConsistent(
       existing.map((trade) =>
         trade.id === current.id ? { ...trade, ...fields } : trade,
@@ -196,16 +218,14 @@ export async function handleTradeRequest({ tablesDB, userId, body }) {
     return { trade: rowToTrade(row) };
   }
 
-  if (action === "delete") {
-    const current = findOwnTrade(existing, body.id);
-    assertConsistent(existing.filter((trade) => trade.id !== current.id));
-    await tablesDB.deleteRow({
-      databaseId: DATABASE_ID,
-      tableId: TRADES_TABLE_ID,
-      rowId: current.id,
-    });
-    return { deleted: true };
-  }
-
-  throw new TradeRequestError(400, "invalid_action", "Geçersiz işlem türü.");
+  // delete: sembol kontrolü gerekmez.
+  const existing = await listUserTrades(tablesDB, userId);
+  const current = findOwnTrade(existing, body.id);
+  assertConsistent(existing.filter((trade) => trade.id !== current.id));
+  await tablesDB.deleteRow({
+    databaseId: DATABASE_ID,
+    tableId: TRADES_TABLE_ID,
+    rowId: current.id,
+  });
+  return { deleted: true };
 }

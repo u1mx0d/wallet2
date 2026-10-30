@@ -3,11 +3,11 @@ import { useState, type ReactNode } from "react";
 import { View } from "react-native";
 
 import {
-    Button,
-    DateField,
-    Input,
-    SegmentedControl,
-    Text,
+  Button,
+  DateField,
+  Input,
+  SegmentedControl,
+  Text,
 } from "@/components/ui";
 import { combineDayWithTime } from "@/domain/dates";
 import { formatTry, parseTryInput } from "@/domain/money";
@@ -76,12 +76,16 @@ export function TransactionForm({
   };
 
   const changeType = (next: TransactionType) => {
-    update("type", next);
-    // Seçili kategori yeni türe ait değilse seçimi temizle.
+    // Seçili kategori yeni türe ait değilse seçimi temizle. İki alan TEK seferde değişmeli.
     const selected = categories.data?.find(
       (category) => category.id === form.values.categoryId,
     );
-    if (selected && selected.type !== next) form.setValue("categoryId", "");
+    form.setFields(
+      selected && selected.type !== next
+        ? { type: next, categoryId: "" }
+        : { type: next },
+    );
+    onChange?.();
   };
 
   const parsedAmount = parseTryInput(form.values.amount);

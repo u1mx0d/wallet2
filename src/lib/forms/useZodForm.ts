@@ -15,6 +15,9 @@ type AnySchema = z.ZodType<any, any, any>;
  * - Her alan için yalnızca ilk hata mesajını gösterir.
  * - Şemanın girişi (metin alanları) ile çıkışı farklı olabilir (ör. "1.234,56" → 123456).
  *   Çıktı tipi şemanın kendisinden okunur: z.output<TSchema>.
+ *
+ * ÖNEMLİ: Birden fazla alanı birlikte değiştirmek için setFields kullan. Arka arkaya iki setValue
+ * çağrısı aynı eski değerlerden başladığı için ilk değişiklik kaybolur.
  */
 export function useZodForm<
   TValues extends Record<string, string>,
@@ -46,13 +49,20 @@ export function useZodForm<
     [schema],
   );
 
-  const setValue = useCallback(
-    (field: keyof TValues, value: string) => {
-      const next = { ...values, [field]: value };
+  /** Bir veya birden fazla alanı TEK seferde değiştirir. */
+  const setFields = useCallback(
+    (patch: Partial<TValues>) => {
+      const next = { ...values, ...patch };
       setValues(next);
       if (submitAttempted) validate(next);
     },
     [values, submitAttempted, validate],
+  );
+
+  const setValue = useCallback(
+    (field: keyof TValues, value: string) =>
+      setFields({ [field]: value } as Partial<TValues>),
+    [setFields],
   );
 
   const handleSubmit = useCallback(
@@ -64,5 +74,5 @@ export function useZodForm<
     [validate, values],
   );
 
-  return { values, errors, setValue, handleSubmit };
+  return { values, errors, setValue, setFields, handleSubmit };
 }

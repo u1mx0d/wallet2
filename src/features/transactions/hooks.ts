@@ -8,6 +8,12 @@ import {
 } from "@tanstack/react-query";
 
 import { useCurrentUserId } from "@/features/auth/useCurrentUserId";
+import type { RangeResult } from "@/features/dashboard/api";
+import {
+  rangeBoundsFromKey,
+  removeFromRange,
+  upsertInRange,
+} from "@/features/dashboard/rangeCache";
 
 import {
   createTransaction,
@@ -19,7 +25,6 @@ import {
 import {
   insertTransaction,
   removeTransaction,
-  replaceTransaction,
   type TransactionFilters,
   type TransactionPages,
 } from "./cache";
@@ -33,6 +38,8 @@ export const transactionKeys = {
     ["transactions", userId, "list", filters] as const,
   detail: (userId: string, id: string) =>
     ["transactions", userId, "detail", id] as const,
+  /** Dashboard dönem aralıkları (bkz. features/dashboard/hooks.ts → dashboardKeys.range). */
+  ranges: (userId: string) => ["transactions", userId, "range"] as const,
 };
 
 /** Bağlantı şeridi (SyncStatusBanner) "transactions" ile başlayan mutation anahtarlarını izler. */
@@ -81,30 +88,53 @@ export function useTransaction(id: string) {
   });
 }
 
-type Snapshot = Array<[QueryKey, TransactionPages | undefined]>;
+type Snapshot = Array<[QueryKey, unknown]>;
+
+type Change =
+  | { kind: "upsert"; transaction: Transaction }
+  | { kind: "remove"; id: string };
 
 /**
- * Önbellekteki TÜM işlem listelerini (her filtre kombinasyonu ayrı bir liste) günceller.
- * Filtre, sorgu anahtarının 4. elemanından okunur. Geri almak için önceki halleri döner.
+ * Optimistic değişikliği önbellekteki TÜM işlem listelerine (her filtre ayrı liste) ve
+ * TÜM dashboard aralıklarına uygular. Geri almak için önceki halleri döner.
  */
-async function updateAllLists(
+async function applyChange(
   queryClient: QueryClient,
   userId: string,
-  updater: (
-    data: TransactionPages,
-    filters: TransactionFilters,
-  ) => TransactionPages,
+  change: Change,
 ): Promise<Snapshot> {
   await queryClient.cancelQueries({ queryKey: transactionKeys.all(userId) });
-  const entries = queryClient.getQueriesData<TransactionPages>({
+  const snapshot: Snapshot = [];
+
+  for (const [key, data] of queryClient.getQueriesData<TransactionPages>({
     queryKey: transactionKeys.lists(userId),
-  });
-  for (const [key, data] of entries) {
+  })) {
     if (!data) continue;
+    snapshot.push([key, data]);
     const filters = (key[3] ?? {}) as TransactionFilters;
-    queryClient.setQueryData(key, updater(data, filters));
+    queryClient.setQueryData(
+      key,
+      change.kind === "remove"
+        ? removeTransaction(data, change.id)
+        : insertTransaction(data, change.transaction, filters),
+    );
   }
-  return entries;
+
+  for (const [key, data] of queryClient.getQueriesData<RangeResult>({
+    queryKey: transactionKeys.ranges(userId),
+  })) {
+    const bounds = rangeBoundsFromKey(key);
+    if (!data || !bounds) continue;
+    snapshot.push([key, data]);
+    queryClient.setQueryData(
+      key,
+      change.kind === "remove"
+        ? removeFromRange(data, change.id)
+        : upsertInRange(data, change.transaction, bounds.from, bounds.to),
+    );
+  }
+
+  return snapshot;
 }
 
 function restore(
@@ -115,26 +145,22 @@ function restore(
   for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
 }
 
-/** Geri alınabilir silme için: işlemi sunucuya dokunmadan tüm listelerden kaldırır. */
+/** Geri alınabilir silme için: işlemi sunucuya dokunmadan listelerden VE dashboard'dan kaldırır. */
 export function removeFromTransactionLists(
   queryClient: QueryClient,
   userId: string,
   id: string,
 ): Promise<Snapshot> {
-  return updateAllLists(queryClient, userId, (data) =>
-    removeTransaction(data, id),
-  );
+  return applyChange(queryClient, userId, { kind: "remove", id });
 }
 
-/** Geri alma: işlemi tüm listelerde (filtreye uyuyorsa) doğru yerine geri koyar. */
+/** Geri alma: işlemi listelerde ve dashboard'da (filtreye/aralığa uyuyorsa) doğru yerine koyar. */
 export function restoreToTransactionLists(
   queryClient: QueryClient,
   userId: string,
   transaction: Transaction,
 ): Promise<Snapshot> {
-  return updateAllLists(queryClient, userId, (data, filters) =>
-    insertTransaction(data, transaction, filters),
-  );
+  return applyChange(queryClient, userId, { kind: "upsert", transaction });
 }
 
 /** Çağıran, ID'yi newTransactionId() ile üretir (optimistic kayıt ve tekrar deneme güvenliği için). */
@@ -146,16 +172,11 @@ export function useCreateTransaction() {
     mutationKey: mutationKeys.create,
     mutationFn: ({ id, input }: { id: string; input: TransactionInput }) =>
       createTransaction({ userId, id, input }),
-    onMutate: ({ id, input }) => {
-      const optimistic: Transaction = {
-        id,
-        ...input,
-        createdAt: new Date().toISOString(),
-      };
-      return updateAllLists(queryClient, userId, (data, filters) =>
-        insertTransaction(data, optimistic, filters),
-      );
-    },
+    onMutate: ({ id, input }) =>
+      applyChange(queryClient, userId, {
+        kind: "upsert",
+        transaction: { id, ...input, createdAt: new Date().toISOString() },
+      }),
     onError: (_error, _variables, snapshot) => restore(queryClient, snapshot),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) }),
@@ -175,12 +196,11 @@ export function useUpdateTransaction() {
       previous: Transaction;
       input: TransactionInput;
     }) => updateTransaction({ id: previous.id, input }),
-    onMutate: ({ previous, input }) => {
-      const optimistic: Transaction = { ...previous, ...input };
-      return updateAllLists(queryClient, userId, (data, filters) =>
-        replaceTransaction(data, optimistic, filters),
-      );
-    },
+    onMutate: ({ previous, input }) =>
+      applyChange(queryClient, userId, {
+        kind: "upsert",
+        transaction: { ...previous, ...input },
+      }),
     onError: (_error, _variables, snapshot) => restore(queryClient, snapshot),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) }),
@@ -196,9 +216,7 @@ export function useDeleteTransaction() {
     mutationKey: mutationKeys.delete,
     mutationFn: ({ id }: { id: string }) => deleteTransaction({ id }),
     onMutate: ({ id }) =>
-      updateAllLists(queryClient, userId, (data) =>
-        removeTransaction(data, id),
-      ),
+      applyChange(queryClient, userId, { kind: "remove", id }),
     onError: (_error, _variables, snapshot) => restore(queryClient, snapshot),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) }),
