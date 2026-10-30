@@ -1,16 +1,17 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { View } from "react-native";
 
 import { SyncStatusBanner } from "@/components/SyncStatusBanner";
 import {
-    Button,
-    Card,
-    EmptyState,
-    ErrorState,
-    Screen,
-    Skeleton,
-    Text,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Screen,
+  Skeleton,
+  Text,
 } from "@/components/ui";
 import { formatTry } from "@/domain/money";
 import { describeEngineError } from "@/domain/portfolio";
@@ -19,13 +20,23 @@ import { InvestmentDisclaimer } from "@/features/portfolio/components/Investment
 import { PortfolioSummaryCard } from "@/features/portfolio/components/PortfolioSummaryCard";
 import { PositionCard } from "@/features/portfolio/components/PositionCard";
 import { QuoteFreshness } from "@/features/portfolio/components/QuoteFreshness";
-import { usePortfolio } from "@/features/portfolio/hooks";
+import { priceKeys, usePortfolio } from "@/features/portfolio/hooks";
+import { useLivePrices } from "@/features/portfolio/useLivePrices";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 
 export default function PortfolioScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [now] = useState(() => new Date());
   const { trades, quotes, view } = usePortfolio();
+  const liveStatus = useLivePrices();
+
+  // Sekmeye her dönüşte fiyatları yenile (Realtime çalışmasa bile güncel fiyat görünsün).
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: priceKeys.quotesAll });
+    }, [queryClient]),
+  );
 
   const openTrade = (side: "buy" | "sell") =>
     router.push({ pathname: "/investments/trade", params: { side } });
@@ -91,7 +102,11 @@ export default function PortfolioScreen() {
     content = (
       <>
         <PortfolioSummaryCard summary={view.summary} />
-        <QuoteFreshness quotes={quotes.data ?? []} now={now} />
+        <QuoteFreshness
+          quotes={quotes.data ?? []}
+          now={now}
+          liveStatus={liveStatus}
+        />
         {quotes.isError ? (
           <Text tone="expense">{getErrorMessage(quotes.error)}</Text>
         ) : null}

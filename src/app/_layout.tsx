@@ -7,6 +7,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { LogBox } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorState, Screen } from "@/components/ui";
@@ -14,6 +15,15 @@ import { useSession } from "@/features/auth/hooks";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 import { queryClient } from "@/lib/query-client";
 import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
+
+/**
+ * react-native-appwrite 3.1.0 bilinen sorunu: Realtime her bağlantıda tarayıcıya özgü
+ * window.localStorage'ı okumaya çalışıyor, React Native'de bulunmadığı için hatayı yakalayıp
+ * console.error ile yazıyor. Bağlantı çerezle doğrulandığı için Realtime ÇALIŞIYOR (ADIM 9c'de
+ * doğrulandı); mesaj zararsız. Yalnızca bu mesaj geliştirme ekranında gizlenir; diğer tüm
+ * hatalar görünmeye devam eder. Ayrıntı: docs/RISKS.md, 19. madde.
+ */
+LogBox.ignoreLogs(["Failed to parse cookie fallback"]);
 
 // Oturum kontrolü bitene kadar splash ekranı açık kalsın (giriş ekranı bir an görünüp kaybolmasın).
 void SplashScreen.preventAutoHideAsync();

@@ -1,33 +1,78 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { vars } from "nativewind";
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useColorScheme, View } from "react-native";
 
 import {
-    getThemeColors,
-    palettes,
-    toCssVariables,
-    type ColorToken,
-    type ThemeName,
+  getThemeColors,
+  palettes,
+  toCssVariables,
+  type ColorToken,
+  type ThemeName,
 } from "./tokens";
 
+export type ThemePreference = "system" | "light" | "dark";
+
+const PREFERENCE_STORAGE_KEY = "wallet.themePreference";
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "system" || value === "light" || value === "dark";
+}
+
 type ThemeContextValue = {
+  /** Uygulanan tema. */
   theme: ThemeName;
   colors: Record<ColorToken, string>;
+  /** Kullanıcının seçimi; "system" telefonun temasını izler. */
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
- * Telefonun sistem temasını okuyup CSS değişkenlerini kök View'a uygular.
- * Altındaki tüm bileşenler bg-surface, text-income gibi sınıfları kullanabilir.
+ * Temayı belirler (kullanıcı tercihi veya telefonun teması) ve CSS değişkenlerini kök View'a uygular.
+ * Tercih telefonda saklanır (gizli olmayan bir arayüz ayarı).
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
-  const theme: ThemeName = systemScheme === "dark" ? "dark" : "light";
+  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+
+  useEffect(() => {
+    AsyncStorage.getItem(PREFERENCE_STORAGE_KEY)
+      .then((stored) => {
+        if (isThemePreference(stored)) setPreferenceState(stored);
+      })
+      .catch(() => {
+        // Okunamazsa sistem teması kullanılır.
+      });
+  }, []);
+
+  const setPreference = useCallback((next: ThemePreference) => {
+    setPreferenceState(next);
+    AsyncStorage.setItem(PREFERENCE_STORAGE_KEY, next).catch(() => {
+      // Kaydedilemezse yalnızca bu oturumda geçerli olur.
+    });
+  }, []);
+
+  const theme: ThemeName =
+    preference === "system"
+      ? systemScheme === "dark"
+        ? "dark"
+        : "light"
+      : preference;
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, colors: getThemeColors(theme) }),
-    [theme],
+    () => ({ theme, colors: getThemeColors(theme), preference, setPreference }),
+    [theme, preference, setPreference],
   );
 
   const cssVariables = useMemo(
@@ -49,7 +94,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Aktif temayı ve düz renk değerlerini verir (grafikler, navigation vb. için). */
+/** Aktif tema, düz renk değerleri ve tema tercihi. */
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {

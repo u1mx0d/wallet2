@@ -1,8 +1,8 @@
 import {
-    keepPreviousData,
-    useMutation,
-    useQuery,
-    useQueryClient,
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -19,6 +19,8 @@ export const portfolioKeys = {
 
 export const priceKeys = {
   all: ["prices"] as const,
+  /** Tüm fiyat listeleri (Realtime güncellemesi bunları hedefler). */
+  quotesAll: ["prices", "quotes"] as const,
   quotes: (symbols: readonly string[]) =>
     ["prices", "quotes", symbols.join(",")] as const,
   search: (term: string) => ["prices", "search", term] as const,

@@ -87,6 +87,20 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profil",
+          headerShown: true,
+          tabBarIcon: ({ focused, size }) => (
+            <TabIcon
+              name="account-circle-outline"
+              focused={focused}
+              size={size}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

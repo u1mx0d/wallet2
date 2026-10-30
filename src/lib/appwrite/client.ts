@@ -1,4 +1,10 @@
-import { Account, Client, Functions, TablesDB } from "react-native-appwrite";
+import {
+  Account,
+  Client,
+  Functions,
+  Realtime,
+  TablesDB,
+} from "react-native-appwrite";
 
 import { env } from "@/lib/env";
 
@@ -16,6 +22,9 @@ export const appwriteClient = new Client()
 export const account = new Account(appwriteClient);
 export const tablesDB = new TablesDB(appwriteClient);
 export const functions = new Functions(appwriteClient);
+
+/** Tek Realtime örneği: tüm abonelikler aynı WebSocket'i paylaşır; yeniden bağlanma SDK'da yerleşik. */
+export const realtime = new Realtime(appwriteClient);
 
 /**
  * Kullanıcı adına sunucu işleri yapan Function ve yolları.

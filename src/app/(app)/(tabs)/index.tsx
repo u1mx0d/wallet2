@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 
 import { SyncStatusBanner } from "@/components/SyncStatusBanner";
 import {
@@ -13,7 +13,7 @@ import {
   Text,
 } from "@/components/ui";
 import type { Period } from "@/domain/periods";
-import { useSession, useSignOut } from "@/features/auth/hooks";
+import { useSession } from "@/features/auth/hooks";
 import { useCategories } from "@/features/categories/hooks";
 import { ExpenseDonutCard } from "@/features/dashboard/components/ExpenseDonutCard";
 import { MonthlyBarsCard } from "@/features/dashboard/components/MonthlyBarsCard";
@@ -23,7 +23,6 @@ import { SummaryCards } from "@/features/dashboard/components/SummaryCards";
 import { useDashboard } from "@/features/dashboard/useDashboard";
 import { TransactionRow } from "@/features/transactions/components/TransactionRow";
 import { useTransactions } from "@/features/transactions/hooks";
-import { useUndoDelete } from "@/features/transactions/undo/UndoDeleteProvider";
 import { getErrorMessage } from "@/lib/appwrite/errors";
 import { cn } from "@/lib/cn";
 
@@ -103,34 +102,17 @@ function RecentTransactions({ now }: { now: Date }) {
 export default function HomeScreen() {
   const router = useRouter();
   const session = useSession();
-  const signOutMutation = useSignOut();
-  const { flushPendingDelete } = useUndoDelete();
   const user = session.data;
 
   const [now] = useState(() => new Date());
   const [period, setPeriod] = useState<Period>({ kind: "month" });
   const dashboard = useDashboard(period, now);
 
-  const confirmSignOut = () => {
-    Alert.alert("Çıkış yap", "Hesabından çıkmak istediğine emin misin?", [
-      { text: "Vazgeç", style: "cancel" },
-      {
-        text: "Çıkış yap",
-        style: "destructive",
-        onPress: () => {
-          // Geri alma süresi dolmamış bir silme varsa oturum kapanmadan gönder.
-          flushPendingDelete();
-          signOutMutation.mutate();
-        },
-      },
-    ]);
-  };
-
   const dashboardError =
     dashboard.periodQuery.error ?? dashboard.monthsQuery.error;
 
   return (
-    <Screen scroll>
+    <Screen scroll edges={["top"]}>
       <View className="gap-1">
         <Text variant="display">
           Merhaba{user?.name ? `, ${user.name}` : ""}
@@ -201,38 +183,6 @@ export default function HomeScreen() {
       )}
 
       <RecentTransactions now={now} />
-
-      <Button
-        title="Kategorileri yönet"
-        variant="secondary"
-        onPress={() => router.push("/categories")}
-        fullWidth
-      />
-
-      {signOutMutation.isError ? (
-        <View
-          accessibilityRole="alert"
-          className="rounded-xl bg-expense/10 p-3"
-        >
-          <Text tone="expense">{getErrorMessage(signOutMutation.error)}</Text>
-        </View>
-      ) : null}
-
-      <Button
-        title="Çıkış yap"
-        variant="ghost"
-        onPress={confirmSignOut}
-        loading={signOutMutation.isPending}
-        fullWidth
-      />
-
-      <Button
-        title="Hesabı sil"
-        variant="ghost"
-        onPress={() => router.push("/delete-account")}
-        disabled={signOutMutation.isPending}
-        fullWidth
-      />
     </Screen>
   );
 }
