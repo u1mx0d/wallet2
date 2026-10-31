@@ -1,0 +1,19 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "coachwallet",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "wallet",
+        "EXPO_PUBLIC_APPWRITE_PLATFORM": "com.coachwallet.app"
+      }
+    }
+  }
+}
