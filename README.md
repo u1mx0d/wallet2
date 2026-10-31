@@ -1,56 +1,97 @@
-# Welcome to your Expo app 👋
+# CoachWallet
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Türk lirası bazlı kişisel finans ve yatırım takip uygulaması. Gelir ve giderlerini kaydet,
+harcamalarını grafiklerle izle, Borsa İstanbul hisselerinden oluşan portföyünün değerini ve
+kâr/zararını takip et.
 
-## Get started
+> 🤖 **Bu proje yapay zekâ destekli geliştirildi.** Ayrıntılar aşağıdaki
+> "Yapay zekâ ile geliştirme" bölümünde.
 
-1. Install dependencies
+## Özellikler
 
-   ```bash
-   npm install
-   ```
+**Gelir ve gider**
+- Kategorili gelir/gider kaydı; varsayılan kategoriler ve kişiye özel kategoriler
+- Dashboard: dönem seçimi (hafta, ay, yıl, özel aralık), özet kartlar, kategori dağılımı,
+  aylık karşılaştırma ve net değişim grafikleri
+- Tüm işlemler ekranı: arama, filtreleme ve gün gün gruplanmış sonsuz liste
+- 5 saniye içinde geri alınabilir silme
 
-2. Start the app
+**Yatırım**
+- BIST hisseleri için alım/satım kaydı ve sembol arama
+- Ağırlıklı ortalama maliyet, gerçekleşmiş ve gerçekleşmemiş kâr/zarar, günlük değişim
+- Portföy dağılım grafiği ve hisse bazında işlem geçmişi
+- Canlı fiyat güncellemesi (Realtime) ve bağlantı durumu göstergesi
+- Eldekinden fazla satış sunucu tarafında engellenir
 
-   ```bash
-   npx expo start
-   ```
+**Genel**
+- Çevrimdışı çalışma: bağlantı yokken yapılan değişiklikler, uygulama kapatılsa bile
+  saklanır ve bağlantı gelince gönderilir
+- Açık/koyu/sistem teması, büyük yazı boyutu ve ekran okuyucu desteği
+- Şifre sıfırlama (e-posta kodu) ve uygulama içinden hesap silme
 
-In the output, you'll find options to open the app in a
+## Teknoloji
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Alan | Kullanılan |
+|---|---|
+| Mobil | Expo SDK 58, React Native, Expo Router, TypeScript (strict) |
+| Arayüz | NativeWind, react-native-gifted-charts, FlashList |
+| Veri | TanStack Query (optimistic update, kalıcı çevrimdışı kuyruk), Zod |
+| Sunucu | Appwrite Cloud (Auth, TablesDB, Functions, Realtime) |
+| Test | Vitest; gerçek Appwrite üzerinde izolasyon ve iş kuralı test script'leri |
+| Derleme | EAS Build |
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Mimari notlar
 
-## Get a fresh project
+- **Para kuruş cinsinden tam sayı olarak tutulur.** Kayan noktalı sayılar yalnızca
+  fiyat sağlayıcısından gelen verinin girişinde kullanılır; tüm hesaplar tam sayı ve
+  gerektiğinde `BigInt` ile yapılır. Yüzde dağılımları her zaman tam %100'e tamamlanır.
+- **Yatırım hesap motoru saf TypeScript'tir** ve hem uygulamada hem sunucuda aynı kodla
+  çalışır. Pozisyonlar saklanmaz; her seferinde işlem geçmişinden hesaplanır.
+- **Veri izolasyonu satır izinleriyle sağlanır.** Bir kullanıcının verisini başka bir
+  kullanıcının göremediği ve yatırım işlemlerinin sunucu kuralları atlanarak yazılamadığı
+  otomatik testlerle doğrulanır.
+- **Fiyat servisi** zamanlanmış bir Function'dır: seans saatlerinde tüm BIST fiyatlarını
+  tek istekte çeker, seans dışında sağlayıcıya istek atmaz, sağlayıcı hata verirse son
+  geçerli fiyatı korur. API anahtarları yalnızca sunucuda tutulur.
 
-When you're ready, run:
+## Yapay zekâ ile geliştirme
 
-```bash
-npm run reset-project
-```
+Bu proje, Anthropic'in yapay zekâ asistanı **Claude** ile adım adım birlikte geliştirildi.
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+**Yapay zekânın katkısı:** Mimari önerileri, kodun büyük bölümü, birim testleri, test
+script'leri, hata ayıklama sırasında kök neden analizi ve dokümantasyon.
 
-### Other setup steps
+**Geliştiricinin katkısı:**
+- Geliştirme ortamının, Appwrite projesinin ve derleme altyapısının kurulması
+- Her adımın gerçek bir Android cihazda test edilmesi; hataların, performans sorunlarının
+  ve arayüz taşmalarının bulunup ekran görüntüleri ve loglarla raporlanması
+- Ürün ve mimari kararları: fiyat sağlayıcısının seçimi, profil sekmesi gibi özellikler,
+  oturum süresi gibi güvenlik tercihleri
+- Kodun okunması, sürüm kontrolü ve yayın süreci
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**Çalışma yöntemi:** Proje küçük adımlara bölündü. Her adımda değişiklik yapıldı,
+otomatik testler ve gerçek cihazda manuel testler geçmeden bir sonraki adıma
+geçilmedi. Bilinen riskler `docs/RISKS.md`'de, güvenlik kontrolleri `docs/SECURITY.md`'de,
+kalite kontrol listesi `docs/QA.md`'de kayıt altında.
 
-## Learn more
+Yapay zekâ destekli geliştirme, kodun otomatik olarak doğru olduğu anlamına gelmiyor:
+bu projedeki birçok hata, ancak gerçek cihazda yapılan testlerle ortaya çıktı ve
+birlikte düzeltildi.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Önemli notlar
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- **Yatırım tavsiyesi değildir.** Uygulama yalnızca kayıt ve takip aracıdır; kâr/zarar
+  hesapları vergi ve diğer kesintileri içermez.
+- **Fiyat verisi** [Bürküt](https://burkutportfoy.com) üzerinden alınır, yaklaşık 15 dakika
+  gecikmelidir ve saatlik güncellenir. Kaynak kişisel/hobi kullanımı içindir; uygulama
+  herkese açık olarak yayınlanacaksa Borsa İstanbul verisi için lisanslı bir dağıtıcı
+  gerekir.
+- Proje kişisel kullanım ve öğrenme amacıyla geliştirilmiştir.
 
-## Join the community
+## Kurulum
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. Bağımlılıkları kur: `npm install`
+2. `.env.example` dosyasını `.env.local` olarak kopyala ve Appwrite bilgilerini doldur.
+3. Appwrite şemasını kur: `npm run appwrite:setup` (`.env.setup` gerekir)
+4. Geliştirme sunucusunu başlat: `npx expo start`
+5. Testleri çalıştır: `npm test`
